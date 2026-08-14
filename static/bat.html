@@ -359,7 +359,7 @@
     window.addEventListener("devicemotion", onMotion, { passive: true });
     grab();
     if (grabTimer) { clearInterval(grabTimer); }
-    grabTimer = setInterval(grab, 20000);   // 서버 판정 시간(60초)보다 짧게
+    grabTimer = setInterval(grab, 7000);    // 서버 판정(20초)의 1/3 — 두 번 놓쳐도 버팀
     askOrientation();
     $("start").classList.add("hidden");
     $("ready").classList.remove("hidden");

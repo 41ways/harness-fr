@@ -36,8 +36,9 @@ COMBO_WINDOW = 2.5
 # 크롬 확장이 이 시간(초) 동안 소식이 없으면 연결이 끊긴 걸로 봄
 HOOK_TIMEOUT = 45.0
 
-# 폰이 이 시간(초) 동안 소식이 없으면 빠따를 내려놓은 걸로 봄
-GRAB_TIMEOUT = 60.0
+# 폰이 이 시간(초) 동안 소식이 없으면 빠따를 내려놓은 걸로 봄.
+# 폰은 이보다 훨씬 자주(7초) 알려와서 한두 번 놓쳐도 오판이 안 남
+GRAB_TIMEOUT = 20.0
 
 
 
@@ -191,7 +192,7 @@ class Hub:
         state를 다시 읽지 않아 타이머가 필요함
         """
         while True:
-            time.sleep(5)
+            time.sleep(2)
             with self._lock:
                 stale = self._grabbed_at and time.time() - self._grabbed_at >= GRAB_TIMEOUT
             if stale:
