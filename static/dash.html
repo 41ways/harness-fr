@@ -175,20 +175,10 @@
     </div>
 
     <div class="card">
-      <h2>속도 (실측)</h2>
-      <div class="rows">
-        <div><span>effort</span><b id="effort">-</b></div>
-        <div><span>fast mode</span><b id="fast">-</b></div>
-        <div><span>마지막 턴</span><b id="tps">-</b></div>
-      </div>
-      <table id="hist"></table>
-    </div>
-
-    <div class="card">
-      <h2>과제 시키기</h2>
-      <input type="text" id="task" placeholder="예: 재촉의 역사에 대해 조사해줘" spellcheck="false">
-      <button id="run">시작</button>
-      <div class="warn" id="taskwarn">진짜 Claude가 여러 턴에 걸쳐 수행함. 때릴 때마다 effort가 내려가고 대화에 재촉이 꽂힘.</div>
+      <h2>클로드에 보내기</h2>
+      <input type="text" id="task" placeholder="시킬 일을 적어" spellcheck="false">
+      <button id="run">보내기</button>
+      <div class="warn" id="taskwarn">붙어 있는 곳으로 그대로 전송됨 (크롬 확장 &gt; 앱 키스트로크 &gt; API 순). 일을 시켜놔야 재촉할 게 생김.</div>
     </div>
 
     <div class="card">
@@ -491,16 +481,13 @@
       log.innerHTML = "";
       spinEl = null;
       turns = [];
-      $("hist").innerHTML = "";
       add("user", "> " + ev.task);
       return;
     }
     if (ev.type === "work_start") {
       startedAt = Date.now();
       streamEl = add("say", "");
-      $("effort").textContent = ev.effort;
-      $("fast").textContent = ev.fast ? "ON ⚡" : "off";
-      return;
+        return;
     }
     if (ev.type === "work_delta") {
       if (!streamEl) { streamEl = add("say", ""); }
@@ -510,13 +497,8 @@
     }
     if (ev.type === "work_end") {
       streamEl = null;
-      // 재촉이 실제로 속도를 올렸는지 확인할 수 있게 턴마다 실측치를 남김
-      var label = ev.effort + (ev.fast ? "+fast" : "");
-      turns.push({ label: label, tps: ev.tps });
       add("speed", "  ⎿ " + label + " · " + ev.seconds + "s · " +
                    ev.tokens + " tokens · " + ev.tps + " tok/s");
-      $("tps").textContent = ev.tps + " tok/s";
-      renderHist();
       return;
     }
     if (ev.type === "work_nag") {
@@ -541,14 +523,6 @@
     }
   }
 
-  function renderHist() {
-    // 마지막 6턴만. 위에서 아래로 읽으면 재촉에 따라 tok/s가 어떻게 변했는지 보임
-    $("hist").innerHTML = turns.slice(-6).map(function (t, i) {
-      return "<tr><td>" + (turns.length - Math.min(6, turns.length) + i + 1) +
-             ". " + t.label + "</td><td>" + t.tps + " tok/s</td></tr>";
-    }).join("");
-  }
-
   // ══════════════════════════════════════════════════════════════════════
   // 스윙 반응
   // ══════════════════════════════════════════════════════════════════════
@@ -568,8 +542,6 @@
     $("mental").textContent =
       swings >= 13 ? "붕괴" : swings >= 7 ? "패닉" : swings >= 3 ? "당황" : "멀쩡";
 
-    if (ev.effort) { $("effort").textContent = ev.effort; }
-    $("fast").textContent = ev.fast ? "ON ⚡" : "off";
     if (ev.stage) { setStage(ev.stage); }
 
     // 영상처럼 재촉이 띄어쓰기 없이 계속 이어붙음
@@ -619,7 +591,23 @@
     while (box.children.length > 30) { box.removeChild(box.lastChild); }
   }
 
+  // 확장이 브라우저에서 읽어 보낸 Claude 답변. 자란 만큼만 오므로 같은 줄을
+  // 계속 갈아끼움 — 스트리밍처럼 보임
+  var replyEl = null;
+
+  function onExtReply(ev) {
+    working = true;
+    if (!replyEl) { replyEl = add("say", ""); }
+    replyEl.textContent = ev.text;
+    scroll();
+    if (ev.done) {
+      add("tool", "⏺ " + ev.site + " 답변 끝 (" + ev.text.length + "자)");
+      replyEl = null;
+    }
+  }
+
   function onReset() {
+    replyEl = null;
     $("naglog").innerHTML = '<div class="dimline">아직 없음</div>';
     // 로봇도 1단계로 되돌림. curStage를 0으로 밀어야 setStage가 다시 갈아끼움
     swings = 0; curStage = 0;
@@ -637,16 +625,10 @@
     $("aimode").textContent = s.live_ai ? "Claude" : "내장 대사";
     $("hooked").textContent = s.hooked ? s.hooked + " ✓" : "안 붙음";
     $("swings").textContent = s.swings;
-    $("effort").textContent = s.effort;
-    $("fast").textContent = s.fast ? "ON ⚡" : "off";
     if (s.stage) { setStage(s.stage, s.stage_max); }
     $("combo").textContent = s.combo;
     working = s.working;
-    $("run").disabled = !s.can_work || s.working;
-    if (!s.can_work) {
-      $("taskwarn").textContent = "ANTHROPIC_API_KEY가 없어서 진짜 AI는 못 돌림. 화면 연출만 동작함.";
-      $("taskwarn").className = "warn bad";
-    }
+    $("run").disabled = false;
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -659,6 +641,13 @@
     else if (ev.type === "reaction") { onReaction(ev); }
     else if (ev.type === "state") { onState(ev.state); }
     else if (ev.type === "reset") { onReset(); }
+    else if (ev.type === "said") {
+      // 대시보드에서 보낸 메시지도 화면에 남겨서 대화 흐름이 이어지게 함
+      working = true;
+      add("user", "> " + ev.text);
+      logNag("📨 " + ev.route, ev.text, true);
+    }
+    else if (ev.type === "ext_reply") { onExtReply(ev); }
     else if (ev.type.indexOf("work_") === 0) { onWork(ev); }
     else if (ev.type === "nag_sent") {
       // 실제로 꽂혔다는 확인. 이게 없으면 앱 이름이 틀린 건지 알 길이 없음
@@ -700,15 +689,19 @@
     var task = $("task").value.trim();
     if (!task) { return; }
     $("run").disabled = true;
-    fetch("/task", {
+    fetch("/say", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ task: task })
+      body: JSON.stringify({ text: task })
     }).then(function (r) { return r.json(); }).then(function (data) {
+      $("run").disabled = false;
       if (data.error) {
         $("taskwarn").textContent = data.error;
         $("taskwarn").className = "warn bad";
-        $("run").disabled = false;
+      } else {
+        $("task").value = "";
+        $("taskwarn").textContent = data.route + " 로 보냄 ✓";
+        $("taskwarn").className = "warn";
       }
     });
   }

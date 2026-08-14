@@ -114,6 +114,40 @@ class Hub:
             self._level = max(0, self._level - steps)
             self._level_at = time.time()
 
+    def say(self, text):
+        # type: (str) -> dict
+        """
+        지금 붙어 있는 Claude에 평범한 메시지를 보냄 (재촉 아님).
+
+        일을 시켜놔야 재촉할 게 생기는데, 그러려고 매번 브라우저로 가는 건
+        번거로워서 대시보드에서 바로 던질 수 있게 함. 경로는 붙어 있는 것 중
+        하나를 고름 — 확장(브라우저) > 키스트로크(앱) > api 순.
+        """
+        route = ""
+        if self.hooked():
+            # 확장이 SSE로 받아서 입력창에 넣고 보냄
+            self.publish({"type": "say", "text": text})
+            route = self.hooked()
+        elif self.armed:
+            try:
+                nag.type_into(self.target_app, text, send_esc=False)
+                route = self.target_app
+            except nag.NagError as e:
+                self.publish({"type": "nag_error", "message": str(e)})
+                return {"error": str(e)}
+        elif self.victim is not None and self.victim.ready:
+            try:
+                self.victim.start(text)
+                route = "Claude API"
+                self.publish({"type": "work_task", "task": text})
+            except victim.VictimError as e:
+                return {"error": str(e)}
+        else:
+            return {"error": "보낼 곳이 없음 — 크롬 확장을 붙이거나 진짜 재촉을 켜줘"}
+
+        self.publish({"type": "said", "route": route, "text": text})
+        return {"ok": True, "route": route}
+
     def reset(self):
         # type: () -> None
         """맞은 횟수와 압박 단계를 처음으로 되돌림. 로봇도 1단계로 돌아감."""
@@ -389,27 +423,28 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "strength가 숫자가 아님"}, code=400)
                 return
             self._send_json(self.hub.swing(strength))
-        elif path == "/task":
+        elif path == "/say":
             data = self._read_json()
-            task = data.get("task")
-            if not isinstance(task, str) or not task.strip():
-                self._send_json({"error": "과제 내용이 비어 있음"}, code=400)
+            text = data.get("text")
+            if not isinstance(text, str) or not text.strip():
+                self._send_json({"error": "보낼 내용이 비어 있음"}, code=400)
                 return
-            hub = self.hub
-            if hub.victim is None:
-                self._send_json({"error": "작업용 AI가 준비 안 됨"}, code=400)
-                return
-            try:
-                hub.victim.start(task.strip())
-            except victim.VictimError as e:
-                self._send_json({"error": str(e)}, code=409)
-                return
-            hub.publish({"type": "work_task", "task": task.strip()})
-            hub.publish({"type": "state", "state": hub.state()})
-            self._send_json(hub.state())
+            res = self.hub.say(text.strip())
+            self._send_json(res, code=200 if res.get("ok") else 409)
         elif path == "/reset":
             self.hub.reset()
             self._send_json(self.hub.state())
+        elif path == "/ext_reply":
+            # 확장이 읽어 보내는 Claude 답변 본문. 브라우저에서 도는 Claude가
+            # 뭐라고 답했는지를 대시보드에서 바로 볼 수 있게 함
+            data = self._read_json()
+            self.hub.publish({
+                "type": "ext_reply",
+                "site": str(data.get("site", "?"))[:40],
+                "text": str(data.get("text", ""))[:4000],
+                "done": bool(data.get("done")),
+            })
+            self._send_json({"ok": True})
         elif path == "/ext_report":
             # 확장이 "claude.ai에서 실제로 뭘 했는지" 되돌려 보고하는 곳.
             # 이게 없으면 재촉이 브라우저에 닿았는지 대시보드에서 알 길이 없음

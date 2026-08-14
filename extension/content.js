@@ -42,21 +42,25 @@
       name: "claude.ai",
       composer: ['div[contenteditable="true"].ProseMirror', 'div[contenteditable="true"]'],
       send: ['button[aria-label*="Send"]', 'button[type="submit"]'],
-      stop: ['button[aria-label*="Stop"]']
+      stop: ['button[aria-label*="Stop"]'],
+      reply: ['[data-testid="assistant-message"]', ".font-claude-message",
+              "div[data-is-streaming]"]
     },
     {
       match: /chatgpt\.com|chat\.openai\.com/,
       name: "chatgpt",
       composer: ["#prompt-textarea", 'div[contenteditable="true"]', "textarea"],
       send: ['button[data-testid="send-button"]', 'button[aria-label*="Send"]'],
-      stop: ['button[data-testid="stop-button"]', 'button[aria-label*="Stop"]']
+      stop: ['button[data-testid="stop-button"]', 'button[aria-label*="Stop"]'],
+      reply: ['[data-message-author-role="assistant"]', ".markdown"]
     },
     {
       match: /gemini\.google\.com|aistudio\.google\.com/,
       name: "gemini",
       composer: ['div[contenteditable="true"]', "textarea"],
       send: ['button[aria-label*="Send"]', 'button[aria-label*="Run"]'],
-      stop: ['button[aria-label*="Stop"]']
+      stop: ['button[aria-label*="Stop"]'],
+      reply: ["model-response", ".model-response-text", "ms-chat-turn"]
     }
   ];
 
@@ -161,6 +165,72 @@
   // ══════════════════════════════════════════════════════════════════════
   // 스윙 처리
   // ══════════════════════════════════════════════════════════════════════
+  // ══════════════════════════════════════════════════════════════════════
+  // 답변 읽어서 대시보드로 중계
+  //
+  // 재촉만 보내면 "꽂혔다"까지만 알 수 있고 Claude가 뭐라고 답했는지는 화면을
+  // 봐야 함. 확장은 DOM에 접근할 수 있으니 마지막 답변 블록을 주기적으로 읽어
+  // 자란 만큼만 서버로 보냄
+  // ══════════════════════════════════════════════════════════════════════
+  var WATCH_MS = 90000;      // 한 번 재촉하면 최대 이만큼만 지켜봄
+  var QUIET_MS = 6000;       // 이 시간 동안 안 자라면 답변이 끝난 걸로 봄
+  var watchTimer = null;
+
+  function lastReply() {
+    var el = null;
+    for (var i = 0; i < (site.reply || []).length && !el; i++) {
+      var found = document.querySelectorAll(site.reply[i]);
+      if (found.length) { el = found[found.length - 1]; }
+    }
+    if (!el) { return ""; }
+    return (el.innerText || "").trim();
+  }
+
+  function watchReply() {
+    if (watchTimer) { clearInterval(watchTimer); }
+    var started = Date.now(), lastLen = 0, lastGrow = Date.now(), sentAny = false;
+    watchTimer = setInterval(function () {
+      var text = lastReply();
+      if (text.length > lastLen) {
+        lastLen = text.length;
+        lastGrow = Date.now();
+        sentAny = true;
+        fetch(SERVER + "/ext_reply", {
+          method: "POST",
+          headers: { "Content-Type": "text/plain" },
+          body: JSON.stringify({ site: site.name, text: text, done: false })
+        }).catch(function () {});
+      }
+      var quiet = Date.now() - lastGrow > QUIET_MS;
+      if (quiet || Date.now() - started > WATCH_MS) {
+        clearInterval(watchTimer); watchTimer = null;
+        if (sentAny) {
+          fetch(SERVER + "/ext_reply", {
+            method: "POST",
+            headers: { "Content-Type": "text/plain" },
+            body: JSON.stringify({ site: site.name, text: lastReply(), done: true })
+          }).catch(function () {});
+        }
+      }
+    }, 700);
+  }
+
+  function onSay(ev) {
+    // 대시보드에서 보낸 평범한 메시지 — 중단 없이 그대로 입력하고 전송
+    var composer = findComposer();
+    if (!composer) {
+      flash("입력창 못 찾음", true);
+      report({ error: "입력창을 못 찾음" });
+      return;
+    }
+    typeInto(composer, ev.text);
+    setTimeout(function () {
+      submit(composer);
+      flash("보냄: " + ev.text.slice(0, 24), false);
+      watchReply();
+    }, 80);
+  }
+
   function report(body) {
     body.site = site.name;
     fetch(SERVER + "/ext_report", {
@@ -187,6 +257,7 @@
         flash((stopped ? "인터럽트 + " : "") + ev.typed, false);
         // 실제로 뭘 했는지 서버로 되돌려 보고 → 대시보드에 실시간으로 뜸
         report({ stopped: stopped, typed: ev.typed, sent: sent });
+        watchReply();          // 이어서 나오는 답변을 대시보드로 중계
       }, 60);
     }, stopped ? 180 : 0);
   }
@@ -242,6 +313,7 @@
     es.onmessage = function (e) {
       var ev = JSON.parse(e.data);
       if (ev.type === "swing") { onSwing(ev); }
+      else if (ev.type === "say") { onSay(ev); }
     };
     es.onerror = function () {
       badge.textContent = "clanker-bat 서버 끊김";
