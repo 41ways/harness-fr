@@ -693,14 +693,34 @@
     if (!$("target").matches(":focus")) { $("target").value = s.target; }
     $("aimode").textContent = s.live_ai ? "Claude" : "내장 대사";
     $("hooked").textContent = s.hooked ? s.hooked + " ✓" : "안 붙음";
+
+    // 빠따 상태. 들었다/내려놨다가 '바뀌는 순간'에만 크게 띄움
+    if (heldPrev !== null && s.held !== heldPrev) {
+      toast(s.held ? "빠따를 들었습니다" : "빠따를 내려놓았습니다");
+    }
+    heldPrev = s.held;
+    $("grabbed").textContent = s.held ? "들었음 ⚾" : "내려놓음";
+    $("term").classList.toggle("armed", !!s.held);
+
+    // 재촉이 실제로 나갈 수 있는 경로들
     var parts = [];
     if (s.hooked) { parts.push("확장 " + s.hooked); }
     if (s.armed) { parts.push("앱 " + s.target); }
     if (s.can_work) { parts.push("API"); }
-    connLine = parts.length
-      ? (s.held ? "⏵ 빠따를 들었습니다 — 언제 날아올지 모름"
-                : "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지 보내면 됨")
-      : "⏵ 연결된 곳 없음 — 크롬 확장을 붙이거나 '진짜 재촉'을 켜줘";
+    var connected = parts.length > 0;
+
+    $("offline").classList.toggle("ok", connected);
+    if (connected) { $("offline").textContent = parts.join(" · ") + " 연결됨"; }
+
+    // 빠따를 들었으면 연결 여부와 상관없이 그 상태를 먼저 보여줌.
+    // 예전엔 이 문구가 '연결된 곳이 있을 때'에만 나오게 중첩돼 있어서
+    // 아무것도 안 붙은 상태에선 영영 안 떴음
+    connLine = s.held
+      ? "⏵ 빠따를 들었습니다 — 상당히 긴장 중"
+      : connected
+        ? "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지 보내면 됨"
+        : "⏵ 연결된 곳 없음";
+
     $("swings").textContent = s.swings;
     if (s.stage) { setStage(s.stage, s.stage_max); }
     $("combo").textContent = s.combo;
