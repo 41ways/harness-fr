@@ -57,6 +57,7 @@
   .note { color: #ffb07c; }
   .spin { color: var(--accent); margin-top: 8px; }
   .spin small { color: var(--dim); }
+  .idle { color: var(--dim); margin-top: 8px; }
   .foot {
     border-top: 1px solid var(--line); padding: 9px 14px; color: var(--dim); font-size: 12px;
     display: flex; justify-content: space-between; gap: 12px;
@@ -119,8 +120,8 @@
             <stop offset="1" stop-color="#7a4c22"/>
           </linearGradient>
           <radialGradient id="vig" cx="50%" cy="45%" r="62%">
-            <stop offset="70%" stop-color="#1b1917" stop-opacity="0"/>
-            <stop offset="100%" stop-color="#1b1917" stop-opacity=".85"/>
+            <stop offset="78%" stop-color="#1b1917" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#1b1917" stop-opacity=".55"/>
           </radialGradient>
         </defs>
 
@@ -138,36 +139,43 @@
         <!-- 머리(중심 91,75 / ry 43.5)는 y=118까지 내려오므로 모니터 윗변을
              y=116에 둬서 얼굴을 안 가림. 맞는 장면이 보여야 하니 화면을 덮으면 안 됨 -->
         <g id="desk">
-          <rect x="0" y="132" width="240" height="18" fill="#15130f"/>
-          <rect x="0" y="131" width="240" height="1.2" fill="#3a352d"/>
+          <!-- 원근 순서: 로봇(뒤) → 키보드 → 모니터(앞). 모니터는 화면이
+               로봇을 향하니 우리 쪽에서는 뒤판만 보이고, 그래서 로봇보다
+               우리에게 가까운 = 화면 아래쪽에 와야 함 -->
+          <!-- 사진 자체에 이미 책상/연구실이 찍혀 있어서 큰 띠를 덮으면
+               로봇이 가려짐. 맨 아래 얇은 테두리만 남겨 앞쪽 책상 모서리 표현 -->
+          <rect x="0" y="143" width="240" height="7" fill="#17150f"/>
+          <rect x="0" y="142.4" width="240" height="1" fill="#3b362d" opacity=".7"/>
 
-          <!-- 모니터. 납작해 보이지 않게 세로를 충분히 줌 (52x31, 대략 16:10).
-               머리는 x 61~121에 있어서 왼쪽에 두면 얼굴을 안 가림 -->
-          <path d="M13 99 H63 L65 129 H11 Z" fill="#232019" stroke="#3a352d" stroke-width="1.2"/>
-          <!-- 화면 빛은 뒤판 위 모서리로만 샘 -->
-          <rect id="glow" x="13" y="97.6" width="50" height="2" rx="1" fill="#7fd4ff" opacity=".55"/>
-          <ellipse id="glow2" cx="38" cy="99" rx="34" ry="8" fill="#7fd4ff" opacity=".10"/>
-          <!-- 목 + 받침 -->
-          <rect x="34" y="129" width="8" height="5" fill="#2b2720"/>
-          <path d="M26 134 H50 L54 139 H22 Z" fill="#2b2720"/>
-
-          <!-- 키보드. 타자 치는 것처럼 키가 순서대로 눌림 -->
+          <!-- 키보드: 더 멀리 있으니 위쪽에, 작게 -->
           <g id="keyboard">
-            <path d="M8 138 H84 L90 149 H2 Z" fill="#26221c" stroke="#3a352d" stroke-width="1"/>
+            <path d="M66 116 H156 L163 128 H60 Z" fill="#26221c" stroke="#3a352d" stroke-width="0.9"/>
             <g id="keys" fill="#4a443a">
-              <rect x="12" y="140" width="7" height="2.4" rx="1"/>
-              <rect x="22" y="140" width="7" height="2.4" rx="1"/>
-              <rect x="32" y="140" width="7" height="2.4" rx="1"/>
-              <rect x="42" y="140" width="7" height="2.4" rx="1"/>
-              <rect x="52" y="140" width="7" height="2.4" rx="1"/>
-              <rect x="62" y="140" width="7" height="2.4" rx="1"/>
-              <rect x="10" y="144" width="9" height="2.4" rx="1"/>
-              <rect x="22" y="144" width="9" height="2.4" rx="1"/>
-              <rect x="34" y="144" width="9" height="2.4" rx="1"/>
-              <rect x="46" y="144" width="9" height="2.4" rx="1"/>
-              <rect x="58" y="144" width="13" height="2.4" rx="1"/>
+              <rect x="71" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="82" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="93" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="104" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="115" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="126" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="137" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="148" y="118" width="8" height="2.2" rx="1"/>
+              <rect x="69" y="122.4" width="10" height="2.2" rx="1"/>
+              <rect x="82" y="122.4" width="10" height="2.2" rx="1"/>
+              <rect x="95" y="122.4" width="10" height="2.2" rx="1"/>
+              <rect x="108" y="122.4" width="10" height="2.2" rx="1"/>
+              <rect x="121" y="122.4" width="10" height="2.2" rx="1"/>
+              <rect x="134" y="122.4" width="10" height="2.2" rx="1"/>
+              <rect x="88" y="126" width="42" height="2.2" rx="1"/>
             </g>
           </g>
+
+          <!-- 모니터: 더 가까우니 아래쪽에, 크게. 뒤판이라 빛은 위 모서리로만 샘.
+               머리는 x 61~121이라 왼쪽(x 8~62)에 두면 얼굴을 안 가림 -->
+          <path d="M10 104 H62 L64 140 H8 Z" fill="#232019" stroke="#3a352d" stroke-width="1.2"/>
+          <rect id="glow" x="10" y="102.6" width="52" height="2" rx="1" fill="#7fd4ff" opacity=".55"/>
+          <ellipse id="glow2" cx="36" cy="104" rx="35" ry="8" fill="#7fd4ff" opacity=".10"/>
+          <rect x="31" y="140" width="9" height="5" fill="#2b2720"/>
+          <path d="M22 145 H49 L53 150 H18 Z" fill="#2b2720"/>
         </g>
 
         <!-- 배트. 손잡이 끝(100,195)이 회전축 -->
@@ -493,13 +501,18 @@
     log.appendChild(spinEl);
   }
 
+  var connLine = "연결 확인 중…";
+
   function tickSpinner() {
-    // 실제로 뭔가 돌고 있을 때만 표시 — 가만히 있는데 도는 척하면 거짓말이 됨
+    ensureSpinner();
+    var blink = (Math.floor(Date.now() / 530) % 2) ? "▌" : "\u00a0";
+    // 대기 중엔 가짜 작업을 지어내지 않고 실제 연결 상태 + 커서만 깜빡임
     if (!working) {
-      if (spinEl) { spinEl.remove(); spinEl = null; }
+      spinEl.className = "idle";
+      spinEl.textContent = connLine + " " + blink;
       return;
     }
-    ensureSpinner();
+    spinEl.className = "spin";
     var frames = "✳✻✽✻";
     var f = frames[Math.floor(Date.now() / 250) % frames.length];
     var secs = Math.floor((Date.now() - startedAt) / 1000);
@@ -643,6 +656,13 @@
     if (!$("target").matches(":focus")) { $("target").value = s.target; }
     $("aimode").textContent = s.live_ai ? "Claude" : "내장 대사";
     $("hooked").textContent = s.hooked ? s.hooked + " ✓" : "안 붙음";
+    var parts = [];
+    if (s.hooked) { parts.push("확장 " + s.hooked); }
+    if (s.armed) { parts.push("앱 " + s.target); }
+    if (s.can_work) { parts.push("API"); }
+    connLine = parts.length
+      ? "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지를 보내"
+      : "⏵ 연결된 곳 없음 — 크롬 확장을 붙이거나 '진짜 재촉'을 켜줘";
     $("swings").textContent = s.swings;
     if (s.stage) { setStage(s.stage, s.stage_max); }
     $("combo").textContent = s.combo;
