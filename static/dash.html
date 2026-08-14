@@ -71,6 +71,21 @@
     border: 1px solid #7a3a2a; border-radius: 8px; padding: 9px 13px; font-size: 12px;
   }
   #offline.ok { display: none; }
+  /* 빠따를 들면 화면 전체에 크게 떴다가 사라짐. 클릭은 통과시켜야 하니
+     pointer-events는 꺼둠 */
+  #toast {
+    position: fixed; inset: 0; z-index: 50; display: grid; place-items: center;
+    font-size: clamp(30px, 6vw, 68px); font-weight: 700; letter-spacing: .04em;
+    color: var(--accent); text-shadow: 0 6px 34px #000, 0 0 60px #00000099;
+    opacity: 0; pointer-events: none;
+  }
+  #toast.show { animation: toast 2.6s ease forwards; }
+  @keyframes toast {
+    0%   { opacity: 0; transform: scale(.86); }
+    14%  { opacity: 1; transform: scale(1); }
+    62%  { opacity: 1; transform: scale(1); }
+    100% { opacity: 0; transform: scale(1.07); }
+  }
 
   /* ── 사이드 ─────────────────────────────────────────────────────── */
   .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
@@ -105,6 +120,8 @@
 </style>
 </head>
 <body>
+  <div id="toast" aria-live="polite"></div>
+
   <div id="offline">연결된 곳 없음. 크롬 확장을 붙이거나 '진짜 재촉'을 켜야 메시지가 나감</div>
 
   <div class="term" id="term">
@@ -512,6 +529,7 @@
   }
 
   var connLine = "연결 확인 중…";
+  var heldPrev = null;   // 첫 상태에선 안 띄움 — 새로고침마다 뜨면 성가심
 
   function tickSpinner() {
     ensureSpinner();
@@ -647,6 +665,15 @@
       add("tool", "⏺ " + ev.site + " 답변 끝남 (" + ev.text.length + "자)");
       replyEl = null;
     }
+  }
+
+  // 큰 글씨로 페이드인 → 잠깐 머무름 → 페이드아웃
+  function toast(text) {
+    var el = $("toast");
+    el.textContent = text;
+    el.classList.remove("show");
+    void el.offsetWidth;          // 리플로우를 강제해야 같은 문구도 다시 재생됨
+    el.classList.add("show");
   }
 
   function onReset() {
