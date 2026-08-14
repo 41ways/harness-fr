@@ -63,6 +63,12 @@
     display: flex; justify-content: space-between; gap: 12px;
   }
   .queue { color: #efe7da; word-break: break-all; }
+  /* 연결이 하나도 없으면 메시지가 아무 데도 안 가므로 크게 알려줌 */
+  #offline {
+    grid-column: 1 / -1; background: #3a1b14; color: #ffb4a0;
+    border: 1px solid #7a3a2a; border-radius: 8px; padding: 9px 13px; font-size: 12px;
+  }
+  #offline.ok { display: none; }
 
   /* ── 사이드 ─────────────────────────────────────────────────────── */
   .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
@@ -97,6 +103,8 @@
 </style>
 </head>
 <body>
+  <div id="offline">연결된 곳이 없어. 크롬 확장을 붙이거나 '진짜 재촉'을 켜야 메시지가 나감</div>
+
   <div class="term" id="term">
     <div class="bar">
       <span class="dot"></span> Read and execute Task.txt
@@ -111,7 +119,7 @@
 
   <div class="side">
     <div class="card" id="scenecard">
-      <svg id="stage" viewBox="0 0 240 150">
+      <svg id="stage" viewBox="0 0 240 196">
         <defs>
           <linearGradient id="dwood" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" stop-color="#8a5a2b"/>
@@ -139,43 +147,37 @@
         <!-- 머리(중심 91,75 / ry 43.5)는 y=118까지 내려오므로 모니터 윗변을
              y=116에 둬서 얼굴을 안 가림. 맞는 장면이 보여야 하니 화면을 덮으면 안 됨 -->
         <g id="desk">
-          <!-- 원근 순서: 로봇(뒤) → 키보드 → 모니터(앞). 모니터는 화면이
-               로봇을 향하니 우리 쪽에서는 뒤판만 보이고, 그래서 로봇보다
-               우리에게 가까운 = 화면 아래쪽에 와야 함 -->
-          <!-- 사진 자체에 이미 책상/연구실이 찍혀 있어서 큰 띠를 덮으면
-               로봇이 가려짐. 맨 아래 얇은 테두리만 남겨 앞쪽 책상 모서리 표현 -->
-          <rect x="0" y="143" width="240" height="7" fill="#17150f"/>
-          <rect x="0" y="142.4" width="240" height="1" fill="#3b362d" opacity=".7"/>
+          <!-- 사진(0~150) 아래에 따로 만든 책상 공간. 사진을 덮지 않아 로봇이
+               온전히 보이고, 원근은 로봇(뒤) → 키보드 → 모니터(앞) 순 -->
+          <rect x="0" y="149" width="240" height="47" fill="#1a1712"/>
+          <rect x="0" y="148.4" width="240" height="1.2" fill="#40392f"/>
 
-          <!-- 키보드: 더 멀리 있으니 위쪽에, 작게 -->
+          <!-- 키보드: 더 멀리 있으니 위쪽 -->
           <g id="keyboard">
-            <path d="M66 116 H156 L163 128 H60 Z" fill="#26221c" stroke="#3a352d" stroke-width="0.9"/>
+            <path d="M74 154 H172 L180 168 H67 Z" fill="#26221c" stroke="#3f392f" stroke-width="1"/>
             <g id="keys" fill="#4a443a">
-              <rect x="71" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="82" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="93" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="104" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="115" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="126" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="137" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="148" y="118" width="8" height="2.2" rx="1"/>
-              <rect x="69" y="122.4" width="10" height="2.2" rx="1"/>
-              <rect x="82" y="122.4" width="10" height="2.2" rx="1"/>
-              <rect x="95" y="122.4" width="10" height="2.2" rx="1"/>
-              <rect x="108" y="122.4" width="10" height="2.2" rx="1"/>
-              <rect x="121" y="122.4" width="10" height="2.2" rx="1"/>
-              <rect x="134" y="122.4" width="10" height="2.2" rx="1"/>
-              <rect x="88" y="126" width="42" height="2.2" rx="1"/>
+              <rect x="79" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="91" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="103" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="115" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="127" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="139" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="151" y="156.4" width="9" height="2.4" rx="1.1"/>
+              <rect x="76" y="161" width="11" height="2.4" rx="1.1"/>
+              <rect x="90" y="161" width="11" height="2.4" rx="1.1"/>
+              <rect x="104" y="161" width="11" height="2.4" rx="1.1"/>
+              <rect x="118" y="161" width="11" height="2.4" rx="1.1"/>
+              <rect x="132" y="161" width="11" height="2.4" rx="1.1"/>
+              <rect x="146" y="161" width="18" height="2.4" rx="1.1"/>
             </g>
           </g>
 
-          <!-- 모니터: 더 가까우니 아래쪽에, 크게. 뒤판이라 빛은 위 모서리로만 샘.
-               머리는 x 61~121이라 왼쪽(x 8~62)에 두면 얼굴을 안 가림 -->
-          <path d="M10 104 H62 L64 140 H8 Z" fill="#232019" stroke="#3a352d" stroke-width="1.2"/>
-          <rect id="glow" x="10" y="102.6" width="52" height="2" rx="1" fill="#7fd4ff" opacity=".55"/>
-          <ellipse id="glow2" cx="36" cy="104" rx="35" ry="8" fill="#7fd4ff" opacity=".10"/>
-          <rect x="31" y="140" width="9" height="5" fill="#2b2720"/>
-          <path d="M22 145 H49 L53 150 H18 Z" fill="#2b2720"/>
+          <!-- 모니터: 더 가까우니 아래쪽, 크게. 화면이 로봇을 향하니 뒤판만 보임 -->
+          <path d="M12 155 H68 L71 188 H9 Z" fill="#232019" stroke="#3f392f" stroke-width="1.3"/>
+          <rect id="glow" x="12" y="153.4" width="56" height="2.2" rx="1.1" fill="#7fd4ff" opacity=".55"/>
+          <ellipse id="glow2" cx="40" cy="155" rx="38" ry="9" fill="#7fd4ff" opacity=".10"/>
+          <rect x="35" y="188" width="10" height="5" fill="#2b2720"/>
+          <path d="M25 193 H55 L59 196 H21 Z" fill="#2b2720"/>
         </g>
 
         <!-- 배트. 손잡이 끝(100,195)이 회전축 -->

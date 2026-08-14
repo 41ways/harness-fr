@@ -30,6 +30,14 @@
 
   if (window.top !== window) { return; }   // iframe 안에서는 안 돎
 
+  // 두 번 주입되면 메시지가 두 번 간다. 확장으로 설치한 상태에서 콘솔로
+  // /ext.js를 또 붙이거나, SPA 이동으로 재주입되면 그렇게 됨 — 한 번만 돌게 막음
+  if (window.__clankerBat) {
+    console.warn("[clanker-bat] 이미 실행 중이라 이번 주입은 건너뜀");
+    return;
+  }
+  window.__clankerBat = true;
+
   var SERVER = "http://127.0.0.1:8444";
   var PING_EVERY = 20000;                   // 서버의 연결 판정 시간(45초)보다 짧게
 
