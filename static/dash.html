@@ -106,7 +106,6 @@
 
   <div class="side">
     <div class="card" id="scenecard">
-      <h2>일하는 로봇</h2>
       <svg id="stage" viewBox="0 0 240 150">
         <defs>
           <linearGradient id="dwood" x1="0" y1="0" x2="1" y2="0">
@@ -162,7 +161,7 @@
       <div class="rows" style="margin-top:11px">
         <div><span>연타</span><b id="combo">0</b></div>
         <div><span>마지막 세기</span><b id="power">-</b></div>
-        <div><span>로봇 단계</span><b id="stage">1 / 6</b></div>
+        <div><span>로봇 상태</span><b id="rstate">멀쩡</b></div>
         <div><span>AI 상태</span><b id="mental">멀쩡</b></div>
       </div>
       <button id="reset" class="ghost">초기화</button>
@@ -359,9 +358,11 @@
   // 맞을수록 다른 사진으로 바뀜. 파일이 아직 없는 단계는 건너뛰고 직전 사진을
   // 유지함 — 6장을 다 채우기 전에도 동작하게
   var curStage = 0;
+  var STATE_NAMES = ["멀쩡", "거슬림", "짜증", "지침", "뻗음", "맛감"];
 
   function setStage(stage, max) {
-    $("stage").textContent = stage + " / " + (max || 6);
+    var top = max || 6;
+    $("rstate").textContent = (STATE_NAMES[stage - 1] || "?") + " (" + stage + "/" + top + ")";
     if (stage === curStage) { return; }
     var url = "/static/robots/" + stage + ".jpg";
     var probe = new Image();
@@ -369,7 +370,12 @@
       curStage = stage;
       $("robotimg").setAttribute("href", url);
     };
-    probe.onerror = function () { curStage = stage; };   // 없으면 그대로 둠
+    probe.onerror = function () {
+      // 사진을 못 불러오면 조용히 넘어가지 말고 원인을 남김
+      curStage = stage;
+      console.warn("[clanker-bat] 로봇 사진 로드 실패:", url);
+      $("rstate").textContent = (STATE_NAMES[stage - 1] || "?") + " (사진 없음)";
+    };
     probe.src = url;
   }
 
