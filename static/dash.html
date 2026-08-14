@@ -64,7 +64,8 @@
   .queue { color: #efe7da; word-break: break-all; }
 
   /* ── 사이드 ─────────────────────────────────────────────────────── */
-  .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .side { display: flex; flex-direction: column; gap: 10px; min-height: 0; overflow-y: auto; }
+  .side > .card { flex: 0 0 auto; }   /* 세로가 모자라도 카드를 찌그러뜨리지 않음 */
   .card { background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 13px; }
   .card h2 { margin: 0 0 9px; font-size: 11px; letter-spacing: .18em; color: var(--dim); font-weight: 500; }
   .big { font-size: 44px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
@@ -92,13 +93,6 @@
   .warn { color: var(--dim); font-size: 11px; line-height: 1.6; margin-top: 9px; }
   .warn.bad { color: #ff9d85; }
   .qr { color: var(--dim); font-size: 11px; word-break: break-all; }
-  .naglog { font-size: 11px; max-height: 132px; overflow-y: auto; }
-  .naglog > div { padding: 3px 0; border-bottom: 1px solid #26231f; }
-  .naglog .where { color: var(--fg); }
-  .naglog .what { color: var(--dim); word-break: break-all; }
-  .naglog .bad .what { color: #ff9d85; }
-  .naglog .when { float: right; color: #4f4a42; }
-  .dimline { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -228,11 +222,6 @@
       <datalist id="apps"></datalist>
       <label style="margin-top:8px"><input type="checkbox" id="esc" checked> esc로 먼저 중단</label>
       <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 재촉을 친 뒤 엔터를 누름. 크롬 사이드패널을 노리면 대상은 <b>Google Chrome</b>, esc는 끄고, 패널 입력칸을 한 번 클릭해 커서를 둬야 함.</div>
-    </div>
-
-    <div class="card">
-      <h2>재촉이 꽂힌 곳</h2>
-      <div id="naglog" class="naglog"><div class="dimline">아직 없음</div></div>
     </div>
 
     <div class="card">
@@ -554,7 +543,6 @@
     }
     if (ev.type === "work_nag") {
       add("sys", "[system] " + ev.text);
-      logNag("🤖 Claude API", "대화에 시스템 메시지 주입", true);
       return;
     }
     if (ev.type === "work_end") { /* 아래에서 처리 */ }
@@ -623,25 +611,6 @@
     add("say", ev.text);
   }
 
-  // 재촉이 어디에 실제로 닿았는지 실시간 기록. 터미널·브라우저·API 세 경로가
-  // 각각 어디로 갔는지 한 화면에서 보이게 함
-  function logNag(where, what, ok) {
-    var box = $("naglog");
-    var first = box.querySelector(".dimline");
-    if (first) { box.innerHTML = ""; }
-    var d = document.createElement("div");
-    if (!ok) { d.className = "bad"; }
-    var t = new Date();
-    d.innerHTML = '<span class="when">' +
-      String(t.getHours()).padStart(2, "0") + ":" +
-      String(t.getMinutes()).padStart(2, "0") + ":" +
-      String(t.getSeconds()).padStart(2, "0") + '</span>' +
-      '<span class="where">' + where + "</span><br>" +
-      '<span class="what">' + what.replace(/[<>&]/g, "") + "</span>";
-    box.insertBefore(d, box.firstChild);
-    while (box.children.length > 30) { box.removeChild(box.lastChild); }
-  }
-
   // 확장이 브라우저에서 읽어 보낸 Claude 답변. 자란 만큼만 오므로 같은 줄을
   // 계속 갈아끼움 — 스트리밍처럼 보임
   var replyEl = null;
@@ -659,7 +628,6 @@
 
   function onReset() {
     replyEl = null;
-    $("naglog").innerHTML = '<div class="dimline">아직 없음</div>';
     // 로봇도 1단계로 되돌림. curStage를 0으로 밀어야 setStage가 다시 갈아끼움
     swings = 0; curStage = 0;
     $("power").textContent = "-";
@@ -696,7 +664,6 @@
       // 대시보드에서 보낸 메시지도 화면에 남겨서 대화 흐름이 이어지게 함
       working = true;
       add("user", "> " + ev.text);
-      logNag("📨 " + ev.route, ev.text, true);
     }
     else if (ev.type === "ext_reply") { onExtReply(ev); }
     else if (ev.type.indexOf("work_") === 0) { onWork(ev); }
@@ -705,16 +672,11 @@
       add("note", "  ⎿ " + ev.app + "에 esc + \"" + ev.typed + "\" 침");
       $("warn").textContent = ev.app + "에 재촉 꽂히는 중 ✓";
       $("warn").className = "warn";
-      logNag("🖥 " + ev.app, (ev.esc ? "esc + " : "") + ev.typed, true);
     }
     else if (ev.type === "ext_report") {
       // 크롬 확장이 claude.ai에서 실제로 한 일
       if (ev.error) {
-        logNag("🌐 " + ev.site, ev.error, false);
       } else {
-        logNag("🌐 " + ev.site,
-               (ev.stopped ? "생성 중단 + " : "") + "\"" + ev.typed + "\"" +
-               (ev.sent ? " 전송" : " 입력만"), ev.sent);
       }
     }
     else if (ev.type === "nag_error") {
