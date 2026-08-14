@@ -161,20 +161,32 @@
   // ══════════════════════════════════════════════════════════════════════
   // 스윙 처리
   // ══════════════════════════════════════════════════════════════════════
+  function report(body) {
+    body.site = site.name;
+    fetch(SERVER + "/ext_report", {
+      method: "POST",
+      headers: { "Content-Type": "text/plain" },
+      body: JSON.stringify(body)
+    }).catch(function () {});
+  }
+
   function onSwing(ev) {
     var stopped = interrupt();          // 생성 중이었으면 여기서 끊김
     var composer = findComposer();
     if (!composer) {
       console.warn("[clanker-bat] 입력창을 못 찾음. content.js의 SITES 셀렉터를 확인해줘");
       flash("입력창 못 찾음", true);
+      report({ stopped: stopped, error: "입력창을 못 찾음" });
       return;
     }
     // 중지 직후 UI가 정리될 틈을 조금 줌 — 바로 치면 입력이 씹히는 경우가 있음
     setTimeout(function () {
       typeInto(composer, ev.typed);
       setTimeout(function () {
-        submit(composer);
+        var sent = submit(composer);
         flash((stopped ? "인터럽트 + " : "") + ev.typed, false);
+        // 실제로 뭘 했는지 서버로 되돌려 보고 → 대시보드에 실시간으로 뜸
+        report({ stopped: stopped, typed: ev.typed, sent: sent });
       }, 60);
     }, stopped ? 180 : 0);
   }

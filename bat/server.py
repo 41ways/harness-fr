@@ -36,15 +36,6 @@ COMBO_WINDOW = 2.5
 # 크롬 확장이 이 시간(초) 동안 소식이 없으면 연결이 끊긴 걸로 봄
 HOOK_TIMEOUT = 45.0
 
-# 로봇이 망가지는 단계. 이만큼 맞을 때마다 다음 사진으로 넘어감
-STAGE_EVERY = 3
-STAGE_MAX = 6
-
-
-def stage_of(swings):
-    # type: (int) -> int
-    """맞은 횟수를 1~6단계로 환산."""
-    return min(STAGE_MAX, swings // STAGE_EVERY + 1)
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -201,7 +192,7 @@ class Hub:
             "words": taunt.spinner_words(swings),
             "effort": effort,
             "fast": fast,
-            "stage": stage_of(swings),
+            "stage": taunt.stage_of(swings),
         }
         event.update(line)
 
@@ -249,9 +240,9 @@ class Hub:
                 "can_work": self.victim is not None and self.victim.ready,
                 "working": self.victim is not None and self.victim.busy,
                 "hooked": self._hooked if (self._hooked and time.time() - self._hooked_at < HOOK_TIMEOUT) else "",
-                "stage": stage_of(self.swings),
-                "stage_every": STAGE_EVERY,
-                "stage_max": STAGE_MAX,
+                "stage": taunt.stage_of(self.swings),
+                "stage_every": taunt.STAGE_EVERY,
+                "stage_max": taunt.STAGE_MAX,
             }
 
 
@@ -395,6 +386,19 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/reset":
             self.hub.reset()
             self._send_json(self.hub.state())
+        elif path == "/ext_report":
+            # 확장이 "claude.ai에서 실제로 뭘 했는지" 되돌려 보고하는 곳.
+            # 이게 없으면 재촉이 브라우저에 닿았는지 대시보드에서 알 길이 없음
+            data = self._read_json()
+            self.hub.publish({
+                "type": "ext_report",
+                "site": str(data.get("site", "?"))[:40],
+                "stopped": bool(data.get("stopped")),
+                "typed": str(data.get("typed", ""))[:120],
+                "sent": bool(data.get("sent")),
+                "error": str(data.get("error", ""))[:120],
+            })
+            self._send_json({"ok": True})
         elif path == "/hooked":
             # 크롬 확장이 "나 어느 사이트에 붙었다"고 알려주는 곳.
             # 확장이 조용히 죽으면 원인 찾기가 지옥이라 상태를 눈에 보이게 함

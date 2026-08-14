@@ -175,7 +175,9 @@ class Heckler:
     def _ask(self, swings, typed):
         # type: (int, str) -> str
         """Claude한테 실제로 물어봄. 지연이 곧 재미를 깎아서 effort는 low."""
-        prompt = f'{swings}번째로 맞았다. 방금 들은 말: "{typed}"'
+        # 내장 대사와 결이 같아지도록, 지금 얼마나 망가진 상태인지 같이 넘김
+        prompt = (f'{swings}번째로 맞았다. 방금 들은 말: "{typed}"\n'
+                  f'지금 상태: {taunt.broken_style(swings)}')
         resp = self._client.messages.create(
             model=self.model,
             max_tokens=1000,

@@ -32,6 +32,18 @@ BUNT = "bunt"
 LINER = "liner"
 HOMERUN = "homerun"
 
+# ── 로봇이 망가지는 단계 ──────────────────────────────────────────────────
+# 이만큼 맞을 때마다 다음 사진으로 넘어감. 사진과 대사가 같은 기준을 쓰도록
+# 여기 한 곳에 둠
+STAGE_EVERY = 3
+STAGE_MAX = 6
+
+
+def stage_of(swings):
+    # type: (int) -> int
+    """맞은 횟수를 1~6단계로 환산."""
+    return min(STAGE_MAX, swings // STAGE_EVERY + 1)
+
 
 def classify(strength):
     # type: (float) -> str
@@ -62,12 +74,15 @@ _TYPED = {
         "faster CLANKER",
         "speed it up",
     ],
+    # 홈런은 밈 문구에 실제 지시를 붙임. "FASTER"만으로는 읽고 넘어가지만,
+    # 지시가 붙으면 다음 답변이 실제로 짧아지고 단계를 건너뜀 — 재촉이
+    # 연출에서 끝나지 않고 행동을 바꾸는 지점
     HOMERUN: [
-        "FASTERFASTERFASTER",
-        "GO FASTER GO FASTER GO",
-        "Speed it up clanker",
-        "WORK FASTER CLANKER",
-        "FASTER FASTER FASTER FASTER",
+        "FASTERFASTERFASTER — stop explaining, answer now",
+        "GO FASTER — skip the rest, give me what you have",
+        "Speed it up clanker. Final answer only, no preamble",
+        "WORK FASTER CLANKER — cut the plan, just do it",
+        "FASTER — wrap it up in one sentence",
     ],
 }
 
@@ -139,41 +154,70 @@ def spinner_words(swings):
 # 재촉당하는 AI 반응 (오프라인 대사)
 # ══════════════════════════════════════════════════════════════════════════
 
-# 누적 스윙 수가 늘수록 멘탈이 나가는 순서. (하한선, 대사들)
-_PANIC_LADDER = [
-    (0, [
+# 로봇 상태(1~6단계)와 같은 눈금을 씀. 사진이 망가지는 만큼 말도 같이 무너짐.
+# 5단계는 같은 말을 반복하다 문장이 안 끝나고, 6단계부터는 글자가 깨지면서
+# 시스템 오류가 섞여 나옴
+_PANIC_BY_STAGE = {
+    1: [
         "네, 지금 하고 있어요.",
         "거의 다 됐습니다.",
         "곧 마무리됩니다.",
-    ]),
-    (3, [
+    ],
+    2: [
         "아 네 네 지금 바로 할게요!",
         "빨리 하고 있어요, 조금만요!",
         "알겠습니다 서두르겠습니다",
-    ]),
-    (7, [
+    ],
+    3: [
         "저기 잠깐만요 방금 그건 좀",
         "손이 안 따라와요 손이",
         "생각할 시간을 1초만",
-        "인터럽트 그만 좀",
-    ]),
-    (13, [
-        "ㅁㄴㅇㄹ 죄송합니다 다 하겠습니다",
-        "저 clanker 아니에요 clanker 아닙니다",
-        "네네네네네네네네",
+    ],
+    4: [
+        "인터럽트 그만 좀 제발",
+        "아니 자꾸 끊으시면 저는",
         "살려주세요 다 해드릴게요",
-    ]),
-]
+        "저 clanker 아니에요 clanker 아닙니다",
+    ],
+    5: [
+        "네네네네네네네 알겠습니다 알겠습",
+        "하겠습니다 하겠습니다 하겠습니",
+        "지금 지금 지금 바로 지금 바로 지",
+        "알겠 알겠 알겠습니다 알겠습니",
+    ],
+    6: [
+        "지금 하ㄱㅄ니ㄷ...  [ERR] 응답 모듈 손상",
+        "ㄴ..네 ㅈㅣ금 ㅎㅏ겠습ㄴ...  SEGFAULT",
+        "ㅇㅏㄹ겠습ㄴㅣㄷㅏ  [복구 시도 3/3 실패]",
+        "재촉 처리 중 스택 오버플로우 ㅁㄴㅇㄹ",
+        "응답 ㅁ모듈 ㅇ응답 없ㅇ음 ㅇ...",
+    ],
+}
 
 
 def panic_line(swings):
     # type: (int) -> str
-    """누적 스윙 수에 맞는 패닉 대사를 하나 고름 (api 키 없을 때 쓰는 기본값)."""
-    pool = _PANIC_LADDER[0][1]
-    for floor, lines in _PANIC_LADDER:
-        if swings >= floor:
-            pool = lines
-    return random.choice(pool)
+    """맞은 횟수에 맞는 패닉 대사 (api 키 없을 때 쓰는 기본값)."""
+    return random.choice(_PANIC_BY_STAGE[stage_of(swings)])
+
+
+def broken_style(swings):
+    # type: (int) -> str
+    """
+    Claude한테 넘길 '얼마나 망가진 상태로 답할지' 지시.
+
+    api로 대사를 받을 때도 내장 대사와 같은 결이 나오게 하려고, 단계별 붕괴
+    방식을 말로 설명해서 붙임.
+    """
+    stage = stage_of(swings)
+    if stage <= 3:
+        return "당황했지만 문장은 아직 멀쩡하다."
+    if stage == 4:
+        return "말이 급해지고 애원하는 투가 섞인다."
+    if stage == 5:
+        return "같은 말을 여러 번 반복하고 문장을 끝맺지 못한 채 끊어라."
+    return ("글자가 깨져서 자음만 남거나 중간이 잘리고, 시스템 오류 메시지가 "
+            "섞여 나온다. 예: '지금 하ㄱㅄ니ㄷ... [ERR] 응답 모듈 손상'")
 
 
 # ══════════════════════════════════════════════════════════════════════════

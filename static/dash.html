@@ -89,6 +89,13 @@
   .warn { color: var(--dim); font-size: 11px; line-height: 1.6; margin-top: 9px; }
   .warn.bad { color: #ff9d85; }
   .qr { color: var(--dim); font-size: 11px; word-break: break-all; }
+  .naglog { font-size: 11px; max-height: 132px; overflow-y: auto; }
+  .naglog > div { padding: 3px 0; border-bottom: 1px solid #26231f; }
+  .naglog .where { color: var(--fg); }
+  .naglog .what { color: var(--dim); word-break: break-all; }
+  .naglog .bad .what { color: #ff9d85; }
+  .naglog .when { float: right; color: #4f4a42; }
+  .dimline { color: var(--dim); }
 </style>
 </head>
 <body>
@@ -190,6 +197,11 @@
       <input type="text" id="target" list="apps" placeholder="앱 선택" spellcheck="false">
       <datalist id="apps"></datalist>
       <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 <b>esc로 생성을 끊고</b> 재촉을 친 뒤 엔터를 누름. 지금 떠 있는 앱 중에서 고르면 됨.</div>
+    </div>
+
+    <div class="card">
+      <h2>재촉이 꽂힌 곳</h2>
+      <div id="naglog" class="naglog"><div class="dimline">아직 없음</div></div>
     </div>
 
     <div class="card">
@@ -508,8 +520,10 @@
     }
     if (ev.type === "work_nag") {
       add("sys", "[system] " + ev.text);
+      logNag("🤖 Claude API", "대화에 시스템 메시지 주입", true);
       return;
     }
+    if (ev.type === "work_end") { /* 아래에서 처리 */ }
     if (ev.type === "work_note") { add("note", "  ⎿ " + ev.text); return; }
     if (ev.type === "work_error") {
       working = false;
@@ -585,7 +599,27 @@
     add("say", ev.text);
   }
 
+  // 재촉이 어디에 실제로 닿았는지 실시간 기록. 터미널·브라우저·API 세 경로가
+  // 각각 어디로 갔는지 한 화면에서 보이게 함
+  function logNag(where, what, ok) {
+    var box = $("naglog");
+    var first = box.querySelector(".dimline");
+    if (first) { box.innerHTML = ""; }
+    var d = document.createElement("div");
+    if (!ok) { d.className = "bad"; }
+    var t = new Date();
+    d.innerHTML = '<span class="when">' +
+      String(t.getHours()).padStart(2, "0") + ":" +
+      String(t.getMinutes()).padStart(2, "0") + ":" +
+      String(t.getSeconds()).padStart(2, "0") + '</span>' +
+      '<span class="where">' + where + "</span><br>" +
+      '<span class="what">' + what.replace(/[<>&]/g, "") + "</span>";
+    box.insertBefore(d, box.firstChild);
+    while (box.children.length > 30) { box.removeChild(box.lastChild); }
+  }
+
   function onReset() {
+    $("naglog").innerHTML = '<div class="dimline">아직 없음</div>';
     // 로봇도 1단계로 되돌림. curStage를 0으로 밀어야 setStage가 다시 갈아끼움
     swings = 0; curStage = 0;
     $("power").textContent = "-";
@@ -629,6 +663,17 @@
       add("note", "  ⎿ " + ev.app + "에 esc + \"" + ev.typed + "\" 침");
       $("warn").textContent = ev.app + "에 재촉 꽂히는 중 ✓";
       $("warn").className = "warn";
+      logNag("🖥 " + ev.app, "esc + " + ev.typed, true);
+    }
+    else if (ev.type === "ext_report") {
+      // 크롬 확장이 claude.ai에서 실제로 한 일
+      if (ev.error) {
+        logNag("🌐 " + ev.site, ev.error, false);
+      } else {
+        logNag("🌐 " + ev.site,
+               (ev.stopped ? "생성 중단 + " : "") + "\"" + ev.typed + "\"" +
+               (ev.sent ? " 전송" : " 입력만"), ev.sent);
+      }
     }
     else if (ev.type === "nag_error") {
       $("arm").checked = false;
