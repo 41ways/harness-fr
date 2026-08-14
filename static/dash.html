@@ -35,6 +35,7 @@
     display: flex; align-items: center; gap: 8px;
   }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: #3d3831; }
+  #sound { margin-left: auto; cursor: pointer; user-select: none; }
   .log { flex: 1; overflow-y: auto; padding: 12px 14px; white-space: pre-wrap; word-break: break-word; }
   .log > div { margin-bottom: 2px; }
   .tool { color: var(--dim); }
@@ -88,7 +89,10 @@
 </head>
 <body>
   <div class="term" id="term">
-    <div class="bar"><span class="dot"></span> Read and execute Task.txt</div>
+    <div class="bar">
+      <span class="dot"></span> Read and execute Task.txt
+      <span id="sound" title="아무 데나 클릭하면 소리가 켜짐">🔇</span>
+    </div>
     <div class="log" id="log"></div>
     <div class="foot">
       <span class="queue" id="queue"></span>
@@ -168,6 +172,60 @@
   var log = $("log"), spinEl = null;
 
   function scroll() { log.scrollTop = log.scrollHeight; }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 맞는 소리 — 맥에서는 "딱" (배트에 공이 맞는 소리)
+  //
+  // 폰은 휘두르는 쪽이라 "휭", 맥은 맞는 쪽이라 "딱". 브라우저는 사용자가
+  // 한 번 클릭하기 전엔 소리를 안 내줘서 첫 클릭에 오디오를 염
+  // ══════════════════════════════════════════════════════════════════════
+  var audio = null, muted = false;
+
+  function unlockAudio() {
+    if (audio) { return; }
+    try {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") { audio.resume(); }
+      $("sound").textContent = "🔊";
+      $("sound").title = "소리 켜짐 — 누르면 음소거";
+    } catch (e) { audio = null; }
+  }
+  document.addEventListener("click", unlockAudio, { once: false });
+
+  function crack(strength) {
+    if (!audio || muted) { return; }
+    var t = audio.currentTime;
+    var power = Math.min(strength, 60) / 60;
+
+    // 타격음은 두 겹. (1) 아주 짧고 밝은 노이즈 = 나무가 부딪히는 순간
+    var dur = 0.05;
+    var buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * dur), audio.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < data.length; i++) {
+      // 뒤로 갈수록 급격히 죽여서 "틱" 하는 트랜지언트를 만듦
+      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2.5);
+    }
+    var src = audio.createBufferSource();
+    src.buffer = buf;
+    var hp = audio.createBiquadFilter();
+    hp.type = "highpass";
+    hp.frequency.value = 1400 + power * 2200;
+    var g1 = audio.createGain();
+    g1.gain.value = 0.25 + power * 0.5;
+    src.connect(hp).connect(g1).connect(audio.destination);
+    src.start(t);
+
+    // (2) 빠르게 떨어지는 저음 = 배트가 울리는 몸통
+    var osc = audio.createOscillator(), g2 = audio.createGain();
+    osc.type = "triangle";
+    osc.frequency.setValueAtTime(240 + power * 120, t);
+    osc.frequency.exponentialRampToValueAtTime(80, t + 0.11);
+    g2.gain.setValueAtTime(0.18 + power * 0.35, t);
+    g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
+    osc.connect(g2).connect(audio.destination);
+    osc.start(t);
+    osc.stop(t + 0.14);
+  }
 
   function add(cls, text) {
     var d = document.createElement("div");
@@ -284,6 +342,7 @@
   // 스윙 반응
   // ══════════════════════════════════════════════════════════════════════
   function onSwing(ev) {
+    crack(ev.strength);
     swings = ev.swings;
     startedAt = Date.now();
     $("swings").textContent = swings;
@@ -391,6 +450,13 @@
       }
     });
   }
+  $("sound").addEventListener("click", function (e) {
+    e.stopPropagation();
+    unlockAudio();
+    muted = !muted;
+    $("sound").textContent = muted ? "🔇" : "🔊";
+  });
+
   $("run").addEventListener("click", startTask);
   $("task").addEventListener("keydown", function (e) {
     if (e.key === "Enter") { startTask(); }

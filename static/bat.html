@@ -18,10 +18,11 @@
   }
   body.hit { background: var(--hit); }
   h1 { font-size: 15px; letter-spacing: .28em; margin: 0 0 4px; color: var(--dim); font-weight: 500; }
-  /* 유니코드에 야구 배트 단독 글자가 없어서(🏏는 크리켓 배트+공) 직접 그림 */
-  .bat { margin: 22px 0; transform: rotate(24deg); transition: transform .12s ease-out; }
+  /* 유니코드에 야구 배트 단독 글자가 없어서(🏏는 크리켓 배트+공) 직접 그림.
+     각도는 자이로를 받아 rAF로 매 프레임 직접 넣어서 transition은 안 검 —
+     CSS 전환을 걸면 실시간 추적이 한 박자씩 밀림 */
+  .bat { margin: 18px 0; transform-origin: 50% 88%; will-change: transform; }
   .bat svg { display: block; width: 104px; height: 104px; }
-  body.hit .bat { transform: rotate(-46deg) scale(1.18); }
   .count { font-size: 76px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
   .count small { font-size: 20px; color: var(--dim); font-weight: 500; margin-left: 6px; }
   .last { margin-top: 14px; font-size: 15px; min-height: 22px; color: var(--hit); font-weight: 700; }
@@ -36,6 +37,9 @@
   .hint { margin-top: 20px; font-size: 12px; color: var(--dim); line-height: 1.7; max-width: 280px; }
   .err { color: #ffb4a0; font-size: 13px; margin-top: 14px; max-width: 280px; line-height: 1.6; }
   .hidden { display: none; }
+  /* 화면 밖에 두되 display:none은 안 됨 — 안 보이면 클릭 이벤트가 안 먹어서
+     햅틱도 안 울림 */
+  #hap { position: fixed; left: -9999px; width: 1px; height: 1px; opacity: 0; }
 </style>
 </head>
 <body>
@@ -71,6 +75,9 @@
     <div class="hint" id="hint">폰을 빠따처럼 쥐고 휘두르면 됨.<br>세게 칠수록 세게 재촉함.</div>
   </div>
 
+  <!-- iOS 햅틱용. switch 체크박스를 토글하면 시스템 진동이 울려서 그걸 빌려 씀 -->
+  <label id="hap" aria-hidden="true"><input type="checkbox" switch></label>
+
   <div id="start">
     <button id="go">빠따 잡기</button>
     <div class="hint">아이폰은 센서 권한을 한 번 물어봄.<br>허용해야 스윙이 잡힘.</div>
@@ -94,20 +101,109 @@
   var $ = function (id) { return document.getElementById(id); };
 
   // ══════════════════════════════════════════════════════════════════════
-  // 타격감 연출
+  // 배트 모션 — 자이로로 실시간 추적 + 스윙 아크 애니메이션
+  //
+  // 평소엔 폰 기울기를 그대로 따라가서 손에 든 배트처럼 굴고, 스윙이 잡히면
+  // 그 위에 휘두르는 궤적을 얹음. 궤적 방향은 실제 회전 방향(rotationRate)을
+  // 따라가서 오른쪽으로 휘두르면 오른쪽으로 돔
   // ══════════════════════════════════════════════════════════════════════
-  function crack(strength) {
-    // "딱!" 소리를 신스로 만듦 — 오디오 파일을 받아오면 첫 스윙이 늦게 울림
+  var SWING_MS = 420;
+  var tilt = 24, tiltTarget = 24;          // 현재/목표 기울기(deg)
+  var swingAt = -1e9, swingDir = 1, swingPower = 0;
+  var spinRate = 0;                        // 최근 회전 속도 (방향 판별용)
+
+  function onOrientation(e) {
+    // gamma: 좌우 기울기(-90~90). 손목을 눕히는 각도가 배트 각도랑 제일 잘 맞음
+    // beta: 앞뒤 기울기. 살짝만 섞어서 들어올린 느낌을 냄
+    if (e.gamma === null) { return; }
+    tiltTarget = Math.max(-95, Math.min(95, e.gamma + (e.beta || 0) * 0.25));
+  }
+
+  function easeOut(x) { return 1 - Math.pow(1 - x, 3); }
+  function lerp(a, b, x) { return a + (b - a) * x; }
+
+  function swingAngle(t) {
+    // 뒤로 살짝 젖혔다가(테이크백) → 빠르게 훑고 → 되돌아옴
+    var through = (78 + swingPower * 46) * swingDir;
+    var back = -20 * swingDir;
+    if (t < 0.18) { return lerp(0, back, t / 0.18); }
+    if (t < 0.52) { return lerp(back, through, easeOut((t - 0.18) / 0.34)); }
+    return lerp(through, 0, easeOut((t - 0.52) / 0.48));
+  }
+
+  function frame() {
+    var el = $("bat");
+    if (el) {
+      tilt += (tiltTarget - tilt) * 0.18;   // 손떨림이 그대로 보이지 않게 완만히
+      var t = (performance.now() - swingAt) / SWING_MS;
+      var angle = tilt;
+      var scale = 1;
+      if (t >= 0 && t < 1) {
+        angle = tilt + swingAngle(t);
+        scale = 1 + 0.16 * Math.sin(Math.PI * Math.min(t / 0.6, 1));
+      }
+      el.style.transform = "rotate(" + angle.toFixed(1) + "deg) scale(" + scale.toFixed(3) + ")";
+    }
+    requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 스윙 소리 — 폰에서는 "휭" (배트가 공기를 가르는 소리)
+  //
+  // 맞는 소리("딱")는 여기가 아니라 맥 대시보드에서 남. 폰은 배트를 쥔 손,
+  // 맥은 공이 맞는 자리라서 역할을 나눔
+  // ══════════════════════════════════════════════════════════════════════
+  function whoosh(strength) {
     if (!audio) { return; }
     var t = audio.currentTime;
-    var osc = audio.createOscillator(), gain = audio.createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(140 + strength * 6, t);
-    osc.frequency.exponentialRampToValueAtTime(60, t + 0.09);
-    gain.gain.setValueAtTime(Math.min(0.45, 0.12 + strength / 140), t);
-    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    osc.connect(gain).connect(audio.destination);
-    osc.start(t); osc.stop(t + 0.13);
+    var power = Math.min(strength, 60) / 60;         // 0~1로 정규화
+    var dur = 0.16 + power * 0.12;
+
+    // 휭 소리의 본체는 백색소음. 밴드패스를 위로 훑었다가 내리면
+    // 물체가 옆을 스쳐 지나가는 느낌이 남 (도플러 흉내)
+    var buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * dur), audio.sampleRate);
+    var data = buf.getChannelData(0);
+    for (var i = 0; i < data.length; i++) { data[i] = Math.random() * 2 - 1; }
+
+    var src = audio.createBufferSource();
+    src.buffer = buf;
+
+    var bp = audio.createBiquadFilter();
+    bp.type = "bandpass";
+    bp.Q.value = 1.1;
+    var peakHz = 620 + power * 1500;                 // 세게 칠수록 날카롭게
+    bp.frequency.setValueAtTime(260, t);
+    bp.frequency.exponentialRampToValueAtTime(peakHz, t + dur * 0.42);
+    bp.frequency.exponentialRampToValueAtTime(200, t + dur);
+
+    var gain = audio.createGain();
+    var vol = 0.12 + power * 0.5;
+    gain.gain.setValueAtTime(0.0001, t);
+    gain.gain.exponentialRampToValueAtTime(vol, t + dur * 0.38);
+    gain.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+
+    src.connect(bp).connect(gain).connect(audio.destination);
+    src.start(t);
+    src.stop(t + dur);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 진동
+  //
+  // iOS 사파리는 navigator.vibrate를 아예 지원 안 함. 대신 iOS 17.4+에서
+  // switch 스타일 체크박스를 토글하면 시스템 햅틱이 울리는 걸 이용함.
+  // 안드로이드는 navigator.vibrate가 정석이라 그쪽을 먼저 씀
+  // ══════════════════════════════════════════════════════════════════════
+  function haptic(strength) {
+    if (navigator.vibrate) {
+      navigator.vibrate(strength >= 45 ? [0, 45, 30, 25] : [0, 18]);
+      return;
+    }
+    var label = $("hap");
+    if (!label) { return; }
+    label.click();                                   // iOS 햅틱 유발
+    if (strength >= 45) { setTimeout(function () { label.click(); }, 70); }
   }
 
   function flash(strength) {
@@ -123,8 +219,15 @@
   function hit(strength) {
     count += 1;
     $("count").textContent = count;
+
+    // 스윙 궤적 시작. 방향은 실제로 돈 쪽을 따라감
+    swingAt = performance.now();
+    swingDir = spinRate < 0 ? -1 : 1;
+    swingPower = Math.min(strength, 60) / 60;
+
     flash(strength);
-    crack(strength);
+    whoosh(strength);
+    haptic(strength);
 
     fetch("/swing", {
       method: "POST",
@@ -145,6 +248,12 @@
   // 가속도 처리
   // ══════════════════════════════════════════════════════════════════════
   function onMotion(e) {
+    // 회전 속도는 스윙 궤적 방향을 정하는 데만 씀. gamma축(손목 비트는 축)이
+    // 야구 스윙이랑 제일 잘 맞음
+    if (e.rotationRate && e.rotationRate.gamma !== null) {
+      var r = e.rotationRate.gamma;
+      if (Math.abs(r) > Math.abs(spinRate) * 0.6) { spinRate = r; }
+    }
     var a = e.acceleration;
     // 아이폰은 중력 제외 가속도를 주지만, 안 주는 기기는 중력 포함값에서
     // 9.8을 빼서 근사함
@@ -182,9 +291,31 @@
   // ══════════════════════════════════════════════════════════════════════
   function begin() {
     window.addEventListener("devicemotion", onMotion, { passive: true });
+    askOrientation();
     $("start").classList.add("hidden");
     $("ready").classList.remove("hidden");
-    try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+    // 오디오는 사용자 제스처 안에서 만들어야 iOS가 열어줌 — 버튼 탭이 그 자리
+    try {
+      audio = new (window.AudioContext || window.webkitAudioContext)();
+      if (audio.state === "suspended") { audio.resume(); }
+    } catch (e) { audio = null; }
+  }
+
+  function askOrientation() {
+    // iOS는 자이로(orientation) 권한을 모션과 별도로 물어봄. 거부해도
+    // 스윙 감지는 멀쩡하고 배트가 실시간 추적만 못 하니 조용히 넘어감
+    if (typeof DeviceOrientationEvent === "undefined") { return; }
+    if (typeof DeviceOrientationEvent.requestPermission === "function") {
+      DeviceOrientationEvent.requestPermission().then(function (res) {
+        if (res === "granted") {
+          window.addEventListener("deviceorientation", onOrientation, { passive: true });
+        } else {
+          $("hint").textContent = "자이로 권한이 없어서 배트가 기울기를 못 따라감. 스윙은 됨.";
+        }
+      }).catch(function () {});
+      return;
+    }
+    window.addEventListener("deviceorientation", onOrientation, { passive: true });
   }
 
   function fallback(msg) {
