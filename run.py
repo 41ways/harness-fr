@@ -74,7 +74,7 @@ def main():
     base = f"https://{host}:{args.port}"
     ai_mode = f"Claude {args.model}" if heckler.live else "내장 대사 (api 키 없음)"
     print("")
-    print("  ⚾  빠따 준비 완료")
+    print("  빠따 준비 완료")
     print("  ─────────────────────────────────────────────")
     print(f"  아이폰(빠따) : {base}")
     print(f"  맥(대시보드) : {base}/dash")

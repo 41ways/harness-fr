@@ -18,8 +18,10 @@
   }
   body.hit { background: var(--hit); }
   h1 { font-size: 15px; letter-spacing: .28em; margin: 0 0 4px; color: var(--dim); font-weight: 500; }
-  .bat { font-size: 96px; line-height: 1; margin: 22px 0; transition: transform .12s ease-out; }
-  body.hit .bat { transform: rotate(-42deg) scale(1.18); }
+  /* 유니코드에 야구 배트 단독 글자가 없어서(🏏는 크리켓 배트+공) 직접 그림 */
+  .bat { margin: 22px 0; transform: rotate(24deg); transition: transform .12s ease-out; }
+  .bat svg { display: block; width: 104px; height: 104px; }
+  body.hit .bat { transform: rotate(-46deg) scale(1.18); }
   .count { font-size: 76px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
   .count small { font-size: 20px; color: var(--dim); font-weight: 500; margin-left: 6px; }
   .last { margin-top: 14px; font-size: 15px; min-height: 22px; color: var(--hit); font-weight: 700; }
@@ -38,7 +40,29 @@
 </head>
 <body>
   <h1>C L A N K E R &nbsp; B A T</h1>
-  <div class="bat" id="bat">🏏</div>
+  <div class="bat" id="bat">
+    <svg viewBox="0 0 200 200" aria-label="야구 배트">
+      <defs>
+        <linearGradient id="wood" x1="0" y1="0" x2="1" y2="0">
+          <stop offset="0" stop-color="#8a5a2b"/>
+          <stop offset=".42" stop-color="#d8a163"/>
+          <stop offset=".72" stop-color="#b87a3d"/>
+          <stop offset="1" stop-color="#7a4c22"/>
+        </linearGradient>
+      </defs>
+      <!-- 위가 배럴, 아래가 노브. 길이:배럴 지름을 대략 7:1로 잡아야 배트로 보임 -->
+      <path d="M100 12 C109 12 114 21 114 33 C114 55 114 62 112 76
+               C110 100 106 122 105 146 C105 156 104 166 104 172
+               C104 178 110 181 110 186 C110 191 105 195 100 195
+               C95 195 90 191 90 186 C90 181 96 178 96 172
+               C96 166 95 156 95 146 C94 122 90 100 88 76
+               C86 62 86 55 86 33 C86 21 91 12 100 12 Z"
+            fill="url(#wood)" stroke="#4a2c12" stroke-width="3.5" stroke-linejoin="round"/>
+      <!-- 나뭇결 + 손잡이 테이프 -->
+      <path d="M100 34 C100 80 100 120 100 160" stroke="#00000022" stroke-width="2.5" fill="none"/>
+      <path d="M95 160 H105 M95 168 H105 M95 176 H105" stroke="#00000033" stroke-width="3" stroke-linecap="round"/>
+    </svg>
+  </div>
 
   <div id="ready" class="hidden">
     <div class="count"><span id="count">0</span><small>대</small></div>

@@ -1,4 +1,4 @@
-# clanker-bat ⚾
+# clanker-bat
 
 야구 빠따를 휘둘러서 AI를 재촉하는 프로그램.
 
