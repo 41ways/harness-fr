@@ -228,7 +228,7 @@
     var composer = findComposer();
     if (!composer) {
       flash("입력창 못 찾음", true);
-      report({ error: "입력창을 못 찾음" });
+      report({ error: "입력창 못 찾음" });
       return;
     }
     typeInto(composer, ev.text);
@@ -252,9 +252,9 @@
     var stopped = interrupt();          // 생성 중이었으면 여기서 끊김
     var composer = findComposer();
     if (!composer) {
-      console.warn("[clanker-bat] 입력창을 못 찾음. content.js의 SITES 셀렉터를 확인해줘");
+      console.warn("[clanker-bat] 입력창을 못 찾음. content.js의 SITES 셀렉터 확인 필요");
       flash("입력창 못 찾음", true);
-      report({ stopped: stopped, error: "입력창을 못 찾음" });
+      report({ stopped: stopped, error: "입력창 못 찾음" });
       return;
     }
     // 중지 직후 UI가 정리될 틈을 조금 줌 — 바로 치면 입력이 씹히는 경우가 있음

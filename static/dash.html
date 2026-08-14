@@ -103,12 +103,12 @@
 </style>
 </head>
 <body>
-  <div id="offline">연결된 곳이 없어. 크롬 확장을 붙이거나 '진짜 재촉'을 켜야 메시지가 나감</div>
+  <div id="offline">연결된 곳 없음. 크롬 확장을 붙이거나 '진짜 재촉'을 켜야 메시지가 나감</div>
 
   <div class="term" id="term">
     <div class="bar">
       <span class="dot"></span> Read and execute Task.txt
-      <span id="sound" title="아무 데나 클릭하면 소리가 켜짐">🔇</span>
+      <span id="sound" title="아무 데나 클릭하면 소리 켜짐">🔇</span>
     </div>
     <div class="log" id="log"></div>
     <div class="foot">
@@ -220,9 +220,9 @@
 
     <div class="card">
       <h2>클로드에 보내기</h2>
-      <input type="text" id="task" placeholder="시킬 일을 적어" spellcheck="false">
+      <input type="text" id="task" placeholder="시킬 일 적기" spellcheck="false">
       <button id="run">보내기</button>
-      <div class="warn" id="taskwarn">붙어 있는 곳으로 그대로 전송됨 (크롬 확장 &gt; 앱 키스트로크 &gt; API 순). 일을 시켜놔야 재촉할 게 생김.</div>
+      <div class="warn" id="taskwarn">붙어 있는 곳으로 그대로 전송됨 (크롬 확장 &gt; 앱 키스트로크 &gt; API 순). 일을 시켜놔야 재촉할 게 생김</div>
     </div>
 
     <div class="card">
@@ -231,7 +231,7 @@
       <input type="text" id="target" list="apps" placeholder="앱 선택" spellcheck="false">
       <datalist id="apps"></datalist>
       <label style="margin-top:8px"><input type="checkbox" id="esc" checked> esc로 먼저 중단</label>
-      <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 재촉을 친 뒤 엔터를 누름. 크롬 사이드패널을 노리면 대상은 <b>Google Chrome</b>, esc는 끄고, 패널 입력칸을 한 번 클릭해 커서를 둬야 함.</div>
+      <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 재촉을 친 뒤 엔터를 누름. 크롬 사이드패널을 노리면 대상은 <b>Google Chrome</b>, esc는 끄고, 패널 입력칸을 한 번 눌러 커서를 둬야 함</div>
     </div>
 
     <div class="card">
@@ -576,7 +576,7 @@
     if (ev.type === "work_done") {
       working = false;
       streamEl = null;
-      var why = { finished: "과제 완료", turn_limit: "턴 한도 도달", refused: "거절됨" };
+      var why = { finished: "과제 끝남", turn_limit: "턴 한도 닿음", refused: "거절됨" };
       add("tool", "⏺ " + (why[ev.reason] || ev.reason));
       $("run").disabled = false;
     }
@@ -641,7 +641,7 @@
     replyEl.textContent = ev.text;
     scroll();
     if (ev.done) {
-      add("tool", "⏺ " + ev.site + " 답변 끝 (" + ev.text.length + "자)");
+      add("tool", "⏺ " + ev.site + " 답변 끝남 (" + ev.text.length + "자)");
       replyEl = null;
     }
   }
@@ -668,7 +668,7 @@
     if (s.armed) { parts.push("앱 " + s.target); }
     if (s.can_work) { parts.push("API"); }
     connLine = parts.length
-      ? "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지를 보내"
+      ? "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지 보내면 됨"
       : "⏵ 연결된 곳 없음 — 크롬 확장을 붙이거나 '진짜 재촉'을 켜줘";
     $("swings").textContent = s.swings;
     if (s.stage) { setStage(s.stage, s.stage_max); }
@@ -773,7 +773,7 @@
   loadApps();
   $("target").addEventListener("focus", loadApps);
 
-  $("url").textContent = location.origin + "  ← 아이폰 사파리에서 열기";
+  $("url").textContent = location.origin + "  ← 아이폰 사파리에서 여는 주소";
 })();
 </script>
 </body>

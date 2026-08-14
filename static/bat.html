@@ -78,9 +78,9 @@
 
   <div id="ready" class="hidden">
     <div class="count"><span id="count">0</span><small>대</small></div>
-    <div class="last" id="last">휘둘러</div>
+    <div class="last" id="last">휘두르면 됨</div>
     <div class="meter"><i id="meter"></i></div>
-    <div class="hint" id="hint">폰을 빠따처럼 쥐고 휘두르면 됨.<br>세게 칠수록 세게 재촉함.</div>
+    <div class="hint" id="hint">폰을 빠따처럼 쥐고 휘두르면 됨.<br>세게 칠수록 세게 재촉함</div>
   </div>
 
   <!-- iOS 햅틱용. switch 체크박스를 토글하면 시스템 진동이 울려서 그걸 빌려 씀 -->
@@ -90,7 +90,7 @@
 
   <div id="start">
     <button id="go">빠따 잡기</button>
-    <div class="hint">아이폰은 센서 권한을 한 번 물어봄.<br>허용해야 스윙이 잡힘.</div>
+    <div class="hint">아이폰은 센서 권한을 한 번 물어봄<br>허용해야 스윙이 잡힘</div>
     <div class="err hidden" id="err"></div>
   </div>
 
@@ -352,7 +352,7 @@
         if (res === "granted") {
           window.addEventListener("deviceorientation", onOrientation, { passive: true });
         } else {
-          $("hint").textContent = "자이로 권한이 없어서 배트가 기울기를 못 따라감. 스윙은 됨.";
+          $("hint").textContent = "자이로 권한 없음. 배트가 기울기를 못 따라감. 스윙은 됨";
         }
       }).catch(function () {});
       return;
@@ -362,11 +362,11 @@
 
   function fallback(msg) {
     // 센서를 못 쓰면 화면 자체를 빠따로 씀 — 세게 재촉은 못 하지만 동작은 함
-    $("err").textContent = msg + " 화면을 탭하면 스윙으로 칠게.";
+    $("err").textContent = msg + " 화면 탭하면 스윙으로 침";
     $("err").classList.remove("hidden");
     $("start").classList.add("hidden");
     $("ready").classList.remove("hidden");
-    $("hint").textContent = "화면을 탭할 때마다 한 대씩. " + hapticLabel();
+    $("hint").textContent = "화면 탭할 때마다 한 대씩. " + hapticLabel();
     document.body.addEventListener("click", function () {
       if (Date.now() - lastHit > COOLDOWN) { lastHit = Date.now(); hit(30); }
     });
