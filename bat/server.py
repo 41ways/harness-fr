@@ -277,11 +277,32 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
-        # 크롬 확장의 content script는 페이지(claude.ai) 출처로 요청을 보내서
-        # CORS가 걸림. 로컬 전용 장난감이라 전부 열어둠
-        self.send_header("Access-Control-Allow-Origin", "*")
+        self._cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def _cors(self):
+        # type: () -> None
+        """
+        확장이 붙으려면 필요한 헤더들.
+
+        content script는 페이지(claude.ai) 출처로 요청을 보내서 CORS가 걸리고,
+        거기에 더해 크롬은 공개 사이트에서 사설 주소(127.0.0.1)로 가는 요청을
+        Private Network Access 정책으로 막음. 두 번째 헤더가 없으면 확장이
+        서버에 아예 못 붙고 화면엔 "서버 끊김"으로만 보임
+        """
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Private-Network", "true")
+
+    def do_OPTIONS(self):
+        """크롬이 보내는 프리플라이트. 이게 없으면 501로 튕겨서 연결이 끊김."""
+        self.send_response(204)
+        self._cors()
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.send_header("Content-Length", "0")
+        self.end_headers()
 
     def _send_json(self, obj, code=200):
         # type: (dict, int) -> None
@@ -434,6 +455,7 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", "text/event-stream; charset=utf-8")
         self.send_header("Cache-Control", "no-store")
         self.send_header("Connection", "keep-alive")
+        self._cors()          # 스트림도 확장이 붙는 통로라 같은 헤더가 필요함
         self.end_headers()
 
         q = self.hub.subscribe()
