@@ -51,10 +51,57 @@ self-signed라 어쩔 수 없음 — 센서(DeviceMotion) 권한은 https에서�
 
 ```
 --host    이 맥의 LAN ip (기본: 자동 탐지, vpn 켜져 있으면 틀릴 수 있음)
---port    포트 (기본: 8443)
+--port    포트 (기본: 8443. 확장용 평문 포트는 이 값 +1 = 8444)
 --target  재촉을 타이핑할 앱 (기본: Terminal)
 --model   AI 반응을 만들 모델 (기본: claude-opus-5)
 ```
+
+## 크롬에서 열어둔 AI 재촉하기 (확장)
+
+터미널 말고 **브라우저에서 쓰는 AI**(claude.ai, ChatGPT, Gemini)를 때리고
+싶으면 크롬 확장을 쓰면 됨. 스윙이 오면 확장이 **중지 버튼을 눌러 생성을
+끊고**, 입력창에 재촉을 타이핑해서 보냄. 영상에서 터미널에 하던 짓 그대로.
+
+```
+아이폰 ──https:8443──▶ 서버 ──http://127.0.0.1:8444──▶ 확장 ──▶ claude.ai DOM
+```
+
+### 설치
+
+1. 크롬 주소창에 `chrome://extensions`
+2. 우측 상단 **개발자 모드** 켜기
+3. **압축해제된 확장 프로그램을 로드** → `extension` 폴더 선택
+4. claude.ai 탭 새로고침 → 우측 하단에 `clanker-bat 대기 중` 배지가 뜨면 연결됨
+
+대시보드 **빠따 연결** 카드의 `크롬 확장` 줄에도 `claude.ai ✓` 로 뜸.
+
+### 설치 전에 셀렉터부터 시험해보기
+
+확장을 안 깔고도 똑같이 돌려볼 수 있음. claude.ai 탭에서 개발자 도구 콘솔에:
+
+```js
+fetch("http://127.0.0.1:8444/ext.js").then(r => r.text()).then(eval)
+```
+
+안 되면 콘솔에 뭘 못 찾았는지 찍히니까, 그거 보고 `extension/content.js`
+맨 위 `SITES`의 셀렉터를 고치면 됨.
+
+### 왜 평문 http 포트를 따로 여나
+
+확장은 https 페이지 안에서 도는데, 아이폰용 서버는 자체서명 인증서라 TLS
+검증에 막힘. 반대로 `http://127.0.0.1`은 크롬이 "신뢰 가능한 출처"로 쳐서
+https 페이지에서도 mixed content 차단을 안 걸어줌. 그래서 확장용으로는 평문이
+오히려 맞고, 이 포트는 루프백에만 열어서 밖에서는 못 붙음.
+
+### 한계
+
+- **셀렉터는 사이트가 UI를 바꾸면 깨짐.** 사이트별 셀렉터가 빗나가면
+  aria-label/텍스트로 버튼을 훑는 범용 폴백으로 넘어가고, 그것도 실패하면
+  콘솔에 사유를 찍음
+- 로그인이나 계정 조작은 일절 안 함. 이미 열어둔 탭의 입력창에 글을 넣고
+  보내는 것까지만
+- effort 강등이나 fast mode는 여기선 안 됨 — api 파라미터라 웹 UI로는 못
+  건드림. 웹에선 인터럽트 + 재촉 주입만
 
 ## 진짜 Claude 재촉해서 속도 올리기
 
@@ -134,8 +181,10 @@ bat/cert.py       self-signed 인증서 생성 (아이폰 센서용 https)
 bat/taunt.py      재촉 멘트, 스피너 단어, 오프라인 패닉 대사
 bat/nag.py        osascript 키스트로크 + Claude api 반응
 bat/server.py     https + SSE 서버
+bat/victim.py     실제로 일하는 AI (effort 강등 + fast mode + 재촉 주입)
 static/bat.html   아이폰: 스윙 감지
 static/dash.html  맥: 재촉당하는 AI 터미널
+extension/        크롬 확장 — 웹 AI를 인터럽트하고 재촉 타이핑
 ```
 
 ## 안 한 것

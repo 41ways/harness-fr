@@ -20,6 +20,7 @@ import argparse
 import os
 import socket
 import sys
+import threading
 
 from bat import cert, nag, server, victim
 
@@ -70,9 +71,14 @@ def main():
     certfile, keyfile = cert.ensure_cert(host, CERT_DIR)
     client = nag.make_client()
     heckler = nag.Heckler(model=args.model, client=client)
-    httpd = server.build(host, args.port, certfile, keyfile, heckler, args.target)
-    # Victim은 hub를 참조해야 해서 서버를 만든 뒤에 붙임
-    httpd.hub.victim = victim.Victim(httpd.hub, args.model, client)
+
+    hub = server.Hub(heckler, args.target)
+    hub.victim = victim.Victim(hub, args.model, client)
+
+    https_srv = server.build_https(args.port, hub, certfile, keyfile)
+    ext_port = args.port + 1
+    plain_srv = server.build_plain(ext_port, hub)
+    threading.Thread(target=plain_srv.serve_forever, daemon=True).start()
 
     base = f"https://{host}:{args.port}"
     ai_mode = f"Claude {args.model}" if heckler.live else "내장 대사 (api 키 없음)"
@@ -81,6 +87,7 @@ def main():
     print("  ─────────────────────────────────────────────")
     print(f"  아이폰(빠따) : {base}")
     print(f"  맥(대시보드) : {base}/dash")
+    print(f"  크롬 확장    : http://127.0.0.1:{ext_port}  (확장이 알아서 붙음)")
     print(f"  재촉 대상 앱 : {args.target}   (대시보드에서 켜야 실제로 타이핑됨)")
     print(f"  AI 반응      : {ai_mode}")
     print("")
@@ -89,11 +96,12 @@ def main():
     print("")
 
     try:
-        httpd.serve_forever()
+        https_srv.serve_forever()
     except KeyboardInterrupt:
-        print(f"\n  경기 종료. 총 {httpd.hub.swings}대 쳤음.")
+        print(f"\n  경기 종료. 총 {hub.swings}대 쳤음.")
     finally:
-        httpd.server_close()
+        https_srv.server_close()
+        plain_srv.server_close()
 
 
 if __name__ == "__main__":

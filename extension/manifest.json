@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "clanker-bat",
+  "version": "1.0",
+  "description": "야구 빠따를 휘두르면 브라우저에서 열어둔 AI를 재촉함",
+  "host_permissions": ["http://127.0.0.1/*"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://claude.ai/*",
+        "https://chatgpt.com/*",
+        "https://chat.openai.com/*",
+        "https://gemini.google.com/*",
+        "https://aistudio.google.com/*"
+      ],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}

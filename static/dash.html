@@ -135,7 +135,10 @@
     <div class="card">
       <h2>빠따 연결</h2>
       <div class="qr" id="url"></div>
-      <div class="rows" style="margin-top:9px"><div><span>AI 반응</span><b id="aimode">-</b></div></div>
+      <div class="rows" style="margin-top:9px">
+        <div><span>AI 반응</span><b id="aimode">-</b></div>
+        <div><span>크롬 확장</span><b id="hooked">-</b></div>
+      </div>
     </div>
   </div>
 
@@ -326,6 +329,7 @@
     $("arm").checked = s.armed;
     if (!$("target").matches(":focus")) { $("target").value = s.target; }
     $("aimode").textContent = s.live_ai ? "Claude" : "내장 대사";
+    $("hooked").textContent = s.hooked ? s.hooked + " ✓" : "안 붙음";
     $("swings").textContent = s.swings;
     $("effort").textContent = s.effort;
     $("fast").textContent = s.fast ? "ON ⚡" : "off";

@@ -28,10 +28,13 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import nag, taunt, victim
 
-STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # 콤보 유지 시간(초). 이 안에 다시 치면 연타로 침
 COMBO_WINDOW = 2.5
+
+# 크롬 확장이 이 시간(초) 동안 소식이 없으면 연결이 끊긴 걸로 봄
+HOOK_TIMEOUT = 45.0
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -60,6 +63,8 @@ class Hub:
         self._level = 0           # 압박 단계 (taunt.PRESSURE 인덱스)
         self._level_at = time.time()
         self._pending = []        # 다음 턴에 꽂을 재촉 문장들
+        self._hooked = ""         # 크롬 확장이 붙은 사이트
+        self._hooked_at = 0.0
 
     # ── 구독 관리 ────────────────────────────────────────────────────────
     def subscribe(self):
@@ -106,6 +111,26 @@ class Hub:
         if steps > 0 and self._level > 0:
             self._level = max(0, self._level - steps)
             self._level_at = time.time()
+
+    def hook(self, site):
+        # type: (str) -> None
+        """크롬 확장이 붙었다고 알려옴. 대시보드에 연결 상태를 띄우려는 것."""
+        with self._lock:
+            self._hooked = site
+            self._hooked_at = time.time()
+        self.publish({"type": "state", "state": self.state()})
+
+    def hooked(self):
+        # type: () -> str
+        """확장이 살아 있으면 사이트 이름, 아니면 빈 문자열.
+
+        확장은 주기적으로 다시 알려오게 되어 있어서, 한동안 소식이 없으면
+        탭이 닫혔거나 죽은 걸로 봄.
+        """
+        with self._lock:
+            if self._hooked and time.time() - self._hooked_at < HOOK_TIMEOUT:
+                return self._hooked
+        return ""
 
     def drain_nags(self):
         # type: () -> list
@@ -194,6 +219,7 @@ class Hub:
                 "fast": fast,
                 "can_work": self.victim is not None and self.victim.ready,
                 "working": self.victim is not None and self.victim.busy,
+                "hooked": self._hooked if (self._hooked and time.time() - self._hooked_at < HOOK_TIMEOUT) else "",
             }
 
 
@@ -225,6 +251,9 @@ class Handler(BaseHTTPRequestHandler):
         self.send_header("Content-Type", content_type)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        # 크롬 확장의 content script는 페이지(claude.ai) 출처로 요청을 보내서
+        # CORS가 걸림. 로컬 전용 장난감이라 전부 열어둠
+        self.send_header("Access-Control-Allow-Origin", "*")
         self.end_headers()
         self.wfile.write(body)
 
@@ -235,14 +264,18 @@ class Handler(BaseHTTPRequestHandler):
 
     def _send_page(self, name):
         # type: (str) -> None
-        path = os.path.join(STATIC_DIR, name)
+        self._send_file(os.path.join("static", name), "text/html; charset=utf-8")
+
+    def _send_file(self, rel_path, content_type):
+        # type: (str, str) -> None
+        path = os.path.join(ROOT_DIR, rel_path)
         try:
             with open(path, "rb") as f:
                 body = f.read()
         except OSError:
             self._send(404, b"not found", "text/plain; charset=utf-8")
             return
-        self._send(200, body, "text/html; charset=utf-8")
+        self._send(200, body, content_type)
 
     def _read_json(self):
         # type: () -> dict
@@ -267,6 +300,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(self.hub.state())
         elif path == "/events":
             self._stream()
+        elif path == "/ext.js":
+            # 확장을 안 깔고 북마클릿/콘솔로 붙여볼 때 쓰는 통로
+            self._send_file("extension/content.js", "application/javascript; charset=utf-8")
         else:
             self._send(404, b"not found", "text/plain; charset=utf-8")
 
@@ -298,6 +334,13 @@ class Handler(BaseHTTPRequestHandler):
             hub.publish({"type": "work_task", "task": task.strip()})
             hub.publish({"type": "state", "state": hub.state()})
             self._send_json(hub.state())
+        elif path == "/hooked":
+            # 크롬 확장이 "나 어느 사이트에 붙었다"고 알려주는 곳.
+            # 확장이 조용히 죽으면 원인 찾기가 지옥이라 상태를 눈에 보이게 함
+            data = self._read_json()
+            site = data.get("site")
+            self.hub.hook(site if isinstance(site, str) else "?")
+            self._send_json({"ok": True})
         elif path == "/arm":
             data = self._read_json()
             self.hub.armed = bool(data.get("on"))
@@ -350,14 +393,34 @@ class Handler(BaseHTTPRequestHandler):
 # 서버 기동
 # ══════════════════════════════════════════════════════════════════════════
 
-def build(host, port, certfile, keyfile, heckler, target_app):
-    # type: (str, int, str, str, nag.Heckler, str) -> ThreadingHTTPServer
-    """모든 인터페이스에 바인딩한 https 서버를 만들어서 돌려줌."""
+def build_https(port, hub, certfile, keyfile):
+    # type: (int, Hub, str, str) -> ThreadingHTTPServer
+    """
+    아이폰이 붙는 https 서버. 모든 인터페이스에 바인딩함.
+
+    아이폰이 모션 센서를 https에서만 열어줘서 이쪽은 TLS가 필수.
+    """
     httpd = ThreadingHTTPServer(("0.0.0.0", port), Handler)
     httpd.daemon_threads = True
-    httpd.hub = Hub(heckler, target_app)  # type: ignore[attr-defined]
+    httpd.hub = hub  # type: ignore[attr-defined]
 
     ctx = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
     ctx.load_cert_chain(certfile, keyfile)
     httpd.socket = ctx.wrap_socket(httpd.socket, server_side=True)
+    return httpd
+
+
+def build_plain(port, hub):
+    # type: (int, Hub) -> ThreadingHTTPServer
+    """
+    크롬 확장이 붙는 평문 http 서버. localhost에만 바인딩함.
+
+    확장은 claude.ai(https) 안에서 도는데, 자체서명 인증서로는 TLS 검증에
+    막혀서 https 쪽에 못 붙음. 반대로 http://127.0.0.1은 크롬이 '신뢰 가능한
+    출처'로 쳐서 mixed content 차단을 안 걸어줌 — 그래서 평문이 오히려 맞음.
+    외부에서 접근 못 하게 루프백에만 열어둠.
+    """
+    httpd = ThreadingHTTPServer(("127.0.0.1", port), Handler)
+    httpd.daemon_threads = True
+    httpd.hub = hub  # type: ignore[attr-defined]
     return httpd
