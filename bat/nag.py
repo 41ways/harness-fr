@@ -34,14 +34,39 @@ class NagError(Exception):
 # 진짜 재촉 — 터미널에 타이핑
 # ══════════════════════════════════════════════════════════════════════════
 
+# key code 53 = esc, 36 = return.
+# esc를 먼저 때리는 게 핵심 — Claude Code는 작업 중에 글자만 치면 인터럽트가
+# 아니라 메시지 큐에 쌓기만 함("press up to edit queued messages"). 영상처럼
+# "⎿ Interrupted"를 띄우려면 생성을 먼저 끊어야 함
 _SCRIPT = '''
 tell application "{app}" to activate
-delay 0.12
+delay 0.15
 tell application "System Events"
+    key code 53
+    delay 0.12
     keystroke "{text}"
     key code 36
 end tell
 '''
+
+
+def running_apps():
+    # type: () -> list
+    """
+    지금 화면에 떠 있는 앱 이름들. 대시보드에서 재촉 대상을 고르게 하려고.
+
+    앱 이름을 손으로 타이핑하게 두면 'Terminal'이라고 적어놓고 실제로는
+    iTerm2를 쓰는 식으로 조용히 빗나감 — 제일 흔한 실패 원인이라 목록을 줌.
+    """
+    script = ('tell application "System Events" to get name of every '
+              'application process whose background only is false')
+    try:
+        done = subprocess.run(["osascript", "-e", script],
+                              capture_output=True, timeout=5, check=True)
+    except (FileNotFoundError, subprocess.TimeoutExpired, subprocess.CalledProcessError):
+        return []
+    names = done.stdout.decode("utf-8", "replace").strip().split(", ")
+    return sorted(n for n in names if n)
 
 
 def _escape(text):

@@ -195,6 +195,11 @@ class Hub:
         if self.armed:
             try:
                 nag.type_into(self.target_app, typed)
+                # 성공도 알려줘야 함 — 조용하면 꽂힌 건지 앱 이름이 틀린 건지
+                # 구분이 안 돼서 "왜 안 되지"로 시간을 태우게 됨
+                self.publish({
+                    "type": "nag_sent", "app": self.target_app, "typed": typed,
+                })
             except nag.NagError as e:
                 self.armed = False
                 self.publish({"type": "nag_error", "message": str(e)})
@@ -300,6 +305,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(self.hub.state())
         elif path == "/events":
             self._stream()
+        elif path == "/apps":
+            self._send_json({"apps": nag.running_apps()})
         elif path == "/ext.js":
             # 확장을 안 깔고 북마클릿/콘솔로 붙여볼 때 쓰는 통로
             self._send_file("extension/content.js", "application/javascript; charset=utf-8")

@@ -127,9 +127,10 @@
 
     <div class="card">
       <h2>진짜 재촉</h2>
-      <label><input type="checkbox" id="arm"> 터미널에 실제로 타이핑</label>
-      <input type="text" id="target" placeholder="Terminal" spellcheck="false">
-      <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 재촉을 치고 엔터까지 누름. 최초 1회 손쉬운 사용 권한 필요.</div>
+      <label><input type="checkbox" id="arm"> 실제로 타이핑해서 인터럽트</label>
+      <input type="text" id="target" list="apps" placeholder="앱 선택" spellcheck="false">
+      <datalist id="apps"></datalist>
+      <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 <b>esc로 생성을 끊고</b> 재촉을 친 뒤 엔터를 누름. 지금 떠 있는 앱 중에서 고르면 됨.</div>
     </div>
 
     <div class="card">
@@ -351,6 +352,12 @@
     else if (ev.type === "reaction") { onReaction(ev); }
     else if (ev.type === "state") { onState(ev.state); }
     else if (ev.type.indexOf("work_") === 0) { onWork(ev); }
+    else if (ev.type === "nag_sent") {
+      // 실제로 꽂혔다는 확인. 이게 없으면 앱 이름이 틀린 건지 알 길이 없음
+      add("note", "  ⎿ " + ev.app + "에 esc + \"" + ev.typed + "\" 침");
+      $("warn").textContent = ev.app + "에 재촉 꽂히는 중 ✓";
+      $("warn").className = "warn";
+    }
     else if (ev.type === "nag_error") {
       $("arm").checked = false;
       $("warn").textContent = ev.message;
@@ -388,6 +395,17 @@
   $("task").addEventListener("keydown", function (e) {
     if (e.key === "Enter") { startTask(); }
   });
+
+  // 재촉 대상 후보를 실제 실행 중인 앱에서 채움
+  function loadApps() {
+    fetch("/apps").then(function (r) { return r.json(); }).then(function (d) {
+      $("apps").innerHTML = (d.apps || []).map(function (a) {
+        return '<option value="' + a.replace(/"/g, "&quot;") + '">';
+      }).join("");
+    }).catch(function () {});
+  }
+  loadApps();
+  $("target").addEventListener("focus", loadApps);
 
   $("url").textContent = location.origin + "  ← 아이폰 사파리에서 열기";
   add("tool", "⏺ " + TOOLS[toolAt++]);
