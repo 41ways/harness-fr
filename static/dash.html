@@ -576,7 +576,7 @@
     if (ev.type === "work_done") {
       working = false;
       streamEl = null;
-      var why = { finished: "과제 끝남", turn_limit: "턴 한도 닿음", refused: "거절됨" };
+      var why = { finished: "과제 완료", turn_limit: "턴 한도 도달", refused: "거절됨" };
       add("tool", "⏺ " + (why[ev.reason] || ev.reason));
       $("run").disabled = false;
     }
