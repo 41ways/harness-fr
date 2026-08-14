@@ -36,6 +36,9 @@ COMBO_WINDOW = 2.5
 # 크롬 확장이 이 시간(초) 동안 소식이 없으면 연결이 끊긴 걸로 봄
 HOOK_TIMEOUT = 45.0
 
+# 폰이 이 시간(초) 동안 소식이 없으면 빠따를 내려놓은 걸로 봄
+GRAB_TIMEOUT = 60.0
+
 
 
 # ══════════════════════════════════════════════════════════════════════════
@@ -67,6 +70,7 @@ class Hub:
         self._pending = []        # 다음 턴에 꽂을 재촉 문장들
         self._hooked = ""         # 크롬 확장이 붙은 사이트
         self._hooked_at = 0.0
+        self._grabbed_at = 0.0    # 폰이 빠따를 들고 있다고 알려온 시각
 
     # ── 구독 관리 ────────────────────────────────────────────────────────
     def subscribe(self):
@@ -161,6 +165,44 @@ class Hub:
         self.publish({"type": "reset"})
         self.publish({"type": "state", "state": self.state()})
 
+    def grab(self):
+        # type: () -> None
+        """폰이 빠따를 들었다고 알려옴. 안 맞아도 로봇이 2단계로 긴장함."""
+        was = self.held()
+        with self._lock:
+            self._grabbed_at = time.time()
+        if not was:
+            self.publish({"type": "state", "state": self.state()})
+
+    def release(self):
+        # type: () -> None
+        """빠따를 내려놓음. 1단계로 돌아가고 맞은 횟수도 같이 초기화됨."""
+        with self._lock:
+            self._grabbed_at = 0.0
+        self.reset()
+
+    def watch_grab(self):
+        # type: () -> None
+        """
+        폰이 조용히 사라진 경우를 처리하는 감시 루프.
+
+        내려놓기 버튼을 못 누르고 탭을 닫거나 화면이 꺼질 수 있어서, 소식이
+        끊기면 스스로 내려놓은 걸로 보고 초기화함. 이벤트가 없으면 아무도
+        state를 다시 읽지 않아 타이머가 필요함
+        """
+        while True:
+            time.sleep(5)
+            with self._lock:
+                stale = self._grabbed_at and time.time() - self._grabbed_at >= GRAB_TIMEOUT
+            if stale:
+                self.release()
+
+    def held(self):
+        # type: () -> bool
+        """빠따를 들고 있는지. 폰이 주기적으로 알려오는 걸로 판단."""
+        with self._lock:
+            return time.time() - self._grabbed_at < GRAB_TIMEOUT
+
     def hook(self, site):
         # type: (str) -> None
         """크롬 확장이 붙었다고 알려옴. 대시보드에 연결 상태를 띄우려는 것."""
@@ -227,7 +269,7 @@ class Hub:
             "words": taunt.spinner_words(swings),
             "effort": effort,
             "fast": fast,
-            "stage": taunt.stage_of(swings),
+            "stage": taunt.stage_of(swings, True),
         }
         event.update(line)
 
@@ -277,8 +319,8 @@ class Hub:
                 "can_work": self.victim is not None and self.victim.ready,
                 "working": self.victim is not None and self.victim.busy,
                 "hooked": self._hooked if (self._hooked and time.time() - self._hooked_at < HOOK_TIMEOUT) else "",
-                "stage": taunt.stage_of(self.swings),
-                "stage_every": taunt.STAGE_EVERY,
+                "held": time.time() - self._grabbed_at < GRAB_TIMEOUT,
+                "stage": taunt.stage_of(self.swings, time.time() - self._grabbed_at < GRAB_TIMEOUT),
                 "stage_max": taunt.STAGE_MAX,
             }
 
@@ -458,6 +500,12 @@ class Handler(BaseHTTPRequestHandler):
                 "sent": bool(data.get("sent")),
                 "error": str(data.get("error", ""))[:120],
             })
+            self._send_json({"ok": True})
+        elif path == "/grab":
+            self.hub.grab()
+            self._send_json({"ok": True})
+        elif path == "/release":
+            self.hub.release()
             self._send_json({"ok": True})
         elif path == "/hooked":
             # 크롬 확장이 "나 어느 사이트에 붙었다"고 알려주는 곳.

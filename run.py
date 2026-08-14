@@ -75,6 +75,8 @@ def main():
     hub = server.Hub(heckler, args.target)
     hub.victim = victim.Victim(hub, args.model, client)
 
+    threading.Thread(target=hub.watch_grab, daemon=True).start()
+
     https_srv = server.build_https(args.port, hub, certfile, keyfile)
     ext_port = args.port + 1
     plain_srv = server.build_plain(ext_port, hub)

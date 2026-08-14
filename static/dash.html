@@ -25,6 +25,8 @@
     display: flex; flex-direction: column; overflow: hidden; min-height: 0;
   }
   .term.shake { animation: shake .16s; }
+  /* 빠따를 든 동안엔 터미널 테두리가 긴장한 색으로 */
+  .term.armed { border-color: var(--accent); }
   @keyframes shake {
     0%,100% { transform: translate(0,0); }
     25% { transform: translate(var(--sx), calc(var(--sx) * -0.6)); }
@@ -210,6 +212,7 @@
       <div class="big"><span id="swings">0</span><span>대</span></div>
       <div class="gauge"><i id="gauge"></i></div>
       <div class="rows" style="margin-top:11px">
+        <div><span>빠따</span><b id="grabbed">내려놓음</b></div>
         <div><span>연타</span><b id="combo">0</b></div>
         <div><span>마지막 세기</span><b id="power">-</b></div>
         <div><span>로봇 상태</span><b id="rstate">멀쩡</b></div>
@@ -668,7 +671,8 @@
     if (s.armed) { parts.push("앱 " + s.target); }
     if (s.can_work) { parts.push("API"); }
     connLine = parts.length
-      ? "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지 보내면 됨"
+      ? (s.held ? "⏵ 빠따를 들었습니다 — 언제 날아올지 모름"
+                : "⏵ " + parts.join(" · ") + " 연결됨 — 휘두르거나 메시지 보내면 됨")
       : "⏵ 연결된 곳 없음 — 크롬 확장을 붙이거나 '진짜 재촉'을 켜줘";
     $("swings").textContent = s.swings;
     if (s.stage) { setStage(s.stage, s.stage_max); }

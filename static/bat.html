@@ -48,6 +48,10 @@
     background: #221d18; color: #efe6d8; border: 1px solid #3a332a; border-radius: 50%;
   }
   #mute.off { opacity: .45; }
+  #drop {
+    background: transparent; color: var(--dim); border: 1px solid #3a332a;
+    font-size: 14px; font-weight: 500; padding: 12px 22px; margin-top: 22px;
+  }
 </style>
 </head>
 <body>
@@ -81,6 +85,7 @@
     <div class="last" id="last">휘두르면 됨</div>
     <div class="meter"><i id="meter"></i></div>
     <div class="hint" id="hint">폰을 빠따처럼 쥐고 휘두르면 됨.<br>세게 칠수록 세게 재촉함</div>
+    <button id="drop" type="button">빠따 내려놓기</button>
   </div>
 
   <!-- iOS 햅틱용. switch 체크박스를 토글하면 시스템 진동이 울려서 그걸 빌려 씀 -->
@@ -330,8 +335,31 @@
   // ══════════════════════════════════════════════════════════════════════
   // 시작
   // ══════════════════════════════════════════════════════════════════════
+  var grabTimer = null;
+
+  function grab() {
+    // 빠따를 들고 있다고 서버에 알림. 안 맞아도 로봇이 긴장 단계로 올라감
+    fetch("/grab", { method: "POST" }).catch(function () {});
+  }
+
+  function drop() {
+    // 내려놓으면 서버가 1단계로 되돌리고 맞은 횟수도 초기화함
+    if (grabTimer) { clearInterval(grabTimer); grabTimer = null; }
+    window.removeEventListener("devicemotion", onMotion);
+    window.removeEventListener("deviceorientation", onOrientation);
+    fetch("/release", { method: "POST" }).catch(function () {});
+    count = 0;
+    $("count").textContent = "0";
+    $("last").textContent = "휘두르면 됨";
+    $("ready").classList.add("hidden");
+    $("start").classList.remove("hidden");
+  }
+
   function begin() {
     window.addEventListener("devicemotion", onMotion, { passive: true });
+    grab();
+    if (grabTimer) { clearInterval(grabTimer); }
+    grabTimer = setInterval(grab, 20000);   // 서버 판정 시간(60초)보다 짧게
     askOrientation();
     $("start").classList.add("hidden");
     $("ready").classList.remove("hidden");
@@ -373,11 +401,13 @@
   }
 
   applyMute();
+  $("drop").addEventListener("click", drop);
   $("mute").addEventListener("click", function (e) {
     e.stopPropagation();      // 폴백 모드에서 탭이 스윙으로 세지 않게
     muted = !muted;
     localStorage.setItem("clankerMuted", muted ? "1" : "0");
     applyMute();
+  $("drop").addEventListener("click", drop);
   });
 
   $("go").addEventListener("click", function () {

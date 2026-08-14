@@ -33,16 +33,17 @@ LINER = "liner"
 HOMERUN = "homerun"
 
 # ── 로봇이 망가지는 단계 ──────────────────────────────────────────────────
-# 이만큼 맞을 때마다 다음 사진으로 넘어감. 사진과 대사가 같은 기준을 쓰도록
-# 여기 한 곳에 둠
-STAGE_EVERY = 2
+# 1단계는 아무 일도 없는 기본 상태, 2단계는 빠따를 들었을 때(아직 안 맞음),
+# 3단계부터는 맞을 때마다 한 칸씩. 사진과 대사가 같은 기준을 쓰도록 여기 한 곳에 둠
 STAGE_MAX = 6
 
 
-def stage_of(swings):
-    # type: (int) -> int
-    """맞은 횟수를 1~6단계로 환산."""
-    return min(STAGE_MAX, swings // STAGE_EVERY + 1)
+def stage_of(swings, held=False):
+    # type: (int, bool) -> int
+    """맞은 횟수와 빠따를 들었는지로 1~6단계를 정함."""
+    if swings <= 0:
+        return 2 if held else 1
+    return min(STAGE_MAX, 2 + swings)
 
 
 def classify(strength):
