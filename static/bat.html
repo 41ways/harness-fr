@@ -1,0 +1,197 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<title>빠따</title>
+<style>
+  :root { --hit: #ff5a36; --dim: #6b6257; }
+  * { box-sizing: border-box; -webkit-user-select: none; user-select: none; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; margin: 0; }
+  body {
+    background: #14110e; color: #efe6d8;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    text-align: center; padding: 24px; overflow: hidden;
+    transition: background .08s;
+  }
+  body.hit { background: var(--hit); }
+  h1 { font-size: 15px; letter-spacing: .28em; margin: 0 0 4px; color: var(--dim); font-weight: 500; }
+  .bat { font-size: 96px; line-height: 1; margin: 22px 0; transition: transform .12s ease-out; }
+  body.hit .bat { transform: rotate(-42deg) scale(1.18); }
+  .count { font-size: 76px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+  .count small { font-size: 20px; color: var(--dim); font-weight: 500; margin-left: 6px; }
+  .last { margin-top: 14px; font-size: 15px; min-height: 22px; color: var(--hit); font-weight: 700; }
+  body.hit .last { color: #14110e; }
+  .meter { width: 240px; height: 5px; background: #2a241d; border-radius: 3px; margin-top: 16px; overflow: hidden; }
+  .meter i { display: block; height: 100%; width: 0; background: var(--hit); transition: width .1s; }
+  button {
+    font: inherit; font-size: 17px; font-weight: 700; padding: 18px 30px; margin-top: 26px;
+    background: var(--hit); color: #14110e; border: 0; border-radius: 14px;
+  }
+  button:active { transform: scale(.97); }
+  .hint { margin-top: 20px; font-size: 12px; color: var(--dim); line-height: 1.7; max-width: 280px; }
+  .err { color: #ffb4a0; font-size: 13px; margin-top: 14px; max-width: 280px; line-height: 1.6; }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+  <h1>C L A N K E R &nbsp; B A T</h1>
+  <div class="bat" id="bat">🏏</div>
+
+  <div id="ready" class="hidden">
+    <div class="count"><span id="count">0</span><small>대</small></div>
+    <div class="last" id="last">휘둘러</div>
+    <div class="meter"><i id="meter"></i></div>
+    <div class="hint" id="hint">폰을 빠따처럼 쥐고 휘두르면 됨.<br>세게 칠수록 세게 재촉함.</div>
+  </div>
+
+  <div id="start">
+    <button id="go">빠따 잡기</button>
+    <div class="hint">아이폰은 센서 권한을 한 번 물어봄.<br>허용해야 스윙이 잡힘.</div>
+    <div class="err hidden" id="err"></div>
+  </div>
+
+<script>
+(function () {
+  "use strict";
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 스윙 감지 파라미터
+  // ══════════════════════════════════════════════════════════════════════
+  var FIRE = 14;        // 이 가속도(m/s^2)를 넘으면 스윙 시작으로 봄
+  var RESET = 6;        // 다시 이 밑으로 내려와야 다음 스윙을 받음
+  var COOLDOWN = 320;   // 한 번 친 뒤 최소 간격(ms). 손 떨림 연타 방지
+
+  var swinging = false, peak = 0, lastHit = 0, count = 0;
+  var audio = null;
+
+  var $ = function (id) { return document.getElementById(id); };
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 타격감 연출
+  // ══════════════════════════════════════════════════════════════════════
+  function crack(strength) {
+    // "딱!" 소리를 신스로 만듦 — 오디오 파일을 받아오면 첫 스윙이 늦게 울림
+    if (!audio) { return; }
+    var t = audio.currentTime;
+    var osc = audio.createOscillator(), gain = audio.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(140 + strength * 6, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 0.09);
+    gain.gain.setValueAtTime(Math.min(0.45, 0.12 + strength / 140), t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+    osc.connect(gain).connect(audio.destination);
+    osc.start(t); osc.stop(t + 0.13);
+  }
+
+  function flash(strength) {
+    document.body.classList.add("hit");
+    setTimeout(function () { document.body.classList.remove("hit"); }, 110);
+    $("meter").style.width = Math.min(100, strength / 60 * 100) + "%";
+    setTimeout(function () { $("meter").style.width = "0"; }, 400);
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 서버로 스윙 전송
+  // ══════════════════════════════════════════════════════════════════════
+  function hit(strength) {
+    count += 1;
+    $("count").textContent = count;
+    flash(strength);
+    crack(strength);
+
+    fetch("/swing", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ strength: strength })
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      $("last").textContent = data.subtitle || "";
+      if (typeof data.swings === "number") {
+        count = data.swings;         // 여러 대에서 쳐도 서버 카운트로 맞춤
+        $("count").textContent = count;
+      }
+    }).catch(function () {
+      $("last").textContent = "서버 연결 끊김";
+    });
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 가속도 처리
+  // ══════════════════════════════════════════════════════════════════════
+  function onMotion(e) {
+    var a = e.acceleration;
+    // 아이폰은 중력 제외 가속도를 주지만, 안 주는 기기는 중력 포함값에서
+    // 9.8을 빼서 근사함
+    if (!a || a.x === null) {
+      var g = e.accelerationIncludingGravity;
+      if (!g || g.x === null) { return; }
+      a = { x: g.x, y: g.y, z: g.z };
+      var mag0 = Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z);
+      handle(Math.abs(mag0 - 9.81));
+      return;
+    }
+    handle(Math.sqrt(a.x * a.x + a.y * a.y + a.z * a.z));
+  }
+
+  function handle(mag) {
+    var now = Date.now();
+    if (swinging) {
+      if (mag > peak) { peak = mag; }
+      // 스윙이 잦아들면 그때의 피크값을 세기로 확정
+      if (mag < RESET) {
+        swinging = false;
+        if (now - lastHit > COOLDOWN) { lastHit = now; hit(peak); }
+        peak = 0;
+      }
+      return;
+    }
+    if (mag > FIRE && now - lastHit > COOLDOWN) {
+      swinging = true;
+      peak = mag;
+    }
+  }
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 시작
+  // ══════════════════════════════════════════════════════════════════════
+  function begin() {
+    window.addEventListener("devicemotion", onMotion, { passive: true });
+    $("start").classList.add("hidden");
+    $("ready").classList.remove("hidden");
+    try { audio = new (window.AudioContext || window.webkitAudioContext)(); } catch (e) { audio = null; }
+  }
+
+  function fallback(msg) {
+    // 센서를 못 쓰면 화면 자체를 빠따로 씀 — 세게 재촉은 못 하지만 동작은 함
+    $("err").textContent = msg + " 화면을 탭하면 스윙으로 칠게.";
+    $("err").classList.remove("hidden");
+    $("start").classList.add("hidden");
+    $("ready").classList.remove("hidden");
+    $("hint").textContent = "화면을 탭할 때마다 한 대씩.";
+    document.body.addEventListener("click", function () {
+      if (Date.now() - lastHit > COOLDOWN) { lastHit = Date.now(); hit(30); }
+    });
+  }
+
+  $("go").addEventListener("click", function () {
+    if (typeof DeviceMotionEvent === "undefined") {
+      fallback("이 기기엔 모션 센서가 없음.");
+      return;
+    }
+    if (typeof DeviceMotionEvent.requestPermission === "function") {
+      DeviceMotionEvent.requestPermission().then(function (res) {
+        if (res === "granted") { begin(); }
+        else { fallback("센서 권한이 거부됐음."); }
+      }).catch(function () {
+        fallback("센서 권한 요청이 실패했음 (https가 아닐 수 있음).");
+      });
+      return;
+    }
+    begin();
+  });
+})();
+</script>
+</body>
+</html>
