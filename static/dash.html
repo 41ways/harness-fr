@@ -15,9 +15,9 @@
   body {
     background: #100e0c; color: var(--fg);
     font: 13px/1.55 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    display: grid; grid-template-columns: minmax(0,1fr) 470px; gap: 14px; padding: 14px;
+    display: grid; grid-template-columns: minmax(0,1fr) 330px; gap: 14px; padding: 14px;
   }
-  @media (max-width: 1100px) { body { grid-template-columns: 1fr; } }
+  @media (max-width: 900px) { body { grid-template-columns: 1fr; } }
 
   /* ── 터미널 ─────────────────────────────────────────────────────── */
   .term {
@@ -144,16 +144,36 @@
         <!-- 머리(중심 91,75 / ry 43.5)는 y=118까지 내려오므로 모니터 윗변을
              y=116에 둬서 얼굴을 안 가림. 맞는 장면이 보여야 하니 화면을 덮으면 안 됨 -->
         <g id="desk">
-          <rect x="0" y="134" width="240" height="16" fill="#15130f"/>
-          <rect x="0" y="133" width="240" height="1.2" fill="#3a352d"/>
-          <!-- 화면 뒤판 (아래로 갈수록 넓어지는 사다리꼴) -->
-          <path d="M16 117 H86 L91 136 H11 Z" fill="#232019" stroke="#3a352d" stroke-width="1.2"/>
-          <!-- 위 모서리로 새는 화면 빛 -->
-          <rect id="glow" x="16" y="115.4" width="70" height="2" rx="1" fill="#7fd4ff" opacity=".55"/>
-          <ellipse id="glow2" cx="51" cy="117" rx="44" ry="7" fill="#7fd4ff" opacity=".10"/>
-          <!-- 받침 -->
-          <path d="M40 136 H62 L66 142 H36 Z" fill="#2b2720"/>
-          <rect x="30" y="141" width="42" height="2.4" rx="1.2" fill="#332e26"/>
+          <rect x="0" y="132" width="240" height="18" fill="#15130f"/>
+          <rect x="0" y="131" width="240" height="1.2" fill="#3a352d"/>
+
+          <!-- 모니터. 납작해 보이지 않게 세로를 충분히 줌 (52x31, 대략 16:10).
+               머리는 x 61~121에 있어서 왼쪽에 두면 얼굴을 안 가림 -->
+          <path d="M13 99 H63 L65 129 H11 Z" fill="#232019" stroke="#3a352d" stroke-width="1.2"/>
+          <!-- 화면 빛은 뒤판 위 모서리로만 샘 -->
+          <rect id="glow" x="13" y="97.6" width="50" height="2" rx="1" fill="#7fd4ff" opacity=".55"/>
+          <ellipse id="glow2" cx="38" cy="99" rx="34" ry="8" fill="#7fd4ff" opacity=".10"/>
+          <!-- 목 + 받침 -->
+          <rect x="34" y="129" width="8" height="5" fill="#2b2720"/>
+          <path d="M26 134 H50 L54 139 H22 Z" fill="#2b2720"/>
+
+          <!-- 키보드. 타자 치는 것처럼 키가 순서대로 눌림 -->
+          <g id="keyboard">
+            <path d="M8 138 H84 L90 149 H2 Z" fill="#26221c" stroke="#3a352d" stroke-width="1"/>
+            <g id="keys" fill="#4a443a">
+              <rect x="12" y="140" width="7" height="2.4" rx="1"/>
+              <rect x="22" y="140" width="7" height="2.4" rx="1"/>
+              <rect x="32" y="140" width="7" height="2.4" rx="1"/>
+              <rect x="42" y="140" width="7" height="2.4" rx="1"/>
+              <rect x="52" y="140" width="7" height="2.4" rx="1"/>
+              <rect x="62" y="140" width="7" height="2.4" rx="1"/>
+              <rect x="10" y="144" width="9" height="2.4" rx="1"/>
+              <rect x="22" y="144" width="9" height="2.4" rx="1"/>
+              <rect x="34" y="144" width="9" height="2.4" rx="1"/>
+              <rect x="46" y="144" width="9" height="2.4" rx="1"/>
+              <rect x="58" y="144" width="13" height="2.4" rx="1"/>
+            </g>
+          </g>
         </g>
 
         <!-- 배트. 손잡이 끝(100,195)이 회전축 -->
@@ -312,6 +332,20 @@
                   0.05 * Math.sin(now / 37);
       g.setAttribute("opacity", flick.toFixed(3));
       $("glow2").setAttribute("opacity", (flick * 0.22).toFixed(3));
+    }
+
+    // 타자 치는 흉내 — 손이 안 보이니 키가 하나씩 밝아지고 키보드가 미세하게
+    // 눌리는 걸로 표현함. 재촉당하는 중엔 더 다급하게 두드림
+    var keys = $("keys");
+    if (keys) {
+      var kids = keys.children, speed = working ? 70 : 150;
+      var hot = Math.floor(now / speed) % kids.length;
+      var hot2 = Math.floor(now / speed * 0.7 + 4) % kids.length;
+      for (var i = 0; i < kids.length; i++) {
+        kids[i].setAttribute("fill", (i === hot || i === hot2) ? "#8d8371" : "#4a443a");
+      }
+      $("keyboard").setAttribute("transform",
+        "translate(0," + ((Math.floor(now / speed) % 2) ? 0.35 : 0) + ")");
     }
 
     var idle = t < 0 || t > 1;
