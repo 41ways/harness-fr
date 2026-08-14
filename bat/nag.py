@@ -21,7 +21,6 @@
 ═══════════════════════════════════════════════════════════════════════════
 """
 
-import os
 import subprocess
 
 from . import taunt
@@ -96,18 +95,25 @@ _MODEL = "claude-opus-5"
 def make_client():
     # type: () -> object
     """
-    anthropic sdk와 키가 둘 다 있을 때만 클라이언트를 만듦. 없으면 None.
+    anthropic 클라이언트를 만들어 봄. 자격증명이 없으면 None.
+
+    ANTHROPIC_API_KEY 유무로 직접 판단하지 않고 sdk에 맡김 — sdk는 환경변수
+    말고도 ANTHROPIC_AUTH_TOKEN, `ant auth login`으로 만든 OAuth 프로필까지
+    순서대로 찾아봄. 환경변수만 확인하면 프로필로 로그인한 사람을 거절하게 됨.
 
     자막용 Heckler와 실제로 일하는 Victim이 같은 클라이언트를 나눠 쓰라고
     모듈 함수로 뺐음.
     """
-    if not os.environ.get("ANTHROPIC_API_KEY"):
-        return None
     try:
         import anthropic
     except ImportError:
         return None
-    return anthropic.Anthropic()
+    try:
+        return anthropic.Anthropic()
+    except Exception:
+        # 자격증명을 하나도 못 찾으면 sdk가 생성 시점에 예외를 냄.
+        # 예외 클래스가 버전마다 달라서 여기만 넓게 잡음
+        return None
 
 
 class Heckler:
