@@ -37,13 +37,16 @@ class NagError(Exception):
 # key code 53 = esc, 36 = return.
 # esc를 먼저 때리는 게 핵심 — Claude Code는 작업 중에 글자만 치면 인터럽트가
 # 아니라 메시지 큐에 쌓기만 함("press up to edit queued messages"). 영상처럼
-# "⎿ Interrupted"를 띄우려면 생성을 먼저 끊어야 함
+# "⎿ Interrupted"를 띄우려면 생성을 먼저 끊어야 함.
+# 다만 앱에 따라 esc가 창이나 패널을 닫아버려서(크롬 사이드패널 등) 끌 수 있게 함
+_ESC = '''
+    key code 53
+    delay 0.12'''
+
 _SCRIPT = '''
 tell application "{app}" to activate
 delay 0.15
-tell application "System Events"
-    key code 53
-    delay 0.12
+tell application "System Events"{esc}
     keystroke "{text}"
     key code 36
 end tell
@@ -75,15 +78,19 @@ def _escape(text):
     return text.replace("\\", "\\\\").replace('"', '\\"')
 
 
-def type_into(app, text):
-    # type: (str, str) -> None
+def type_into(app, text, send_esc=True):
+    # type: (str, str, bool) -> None
     """
     app을 앞으로 끌어온 뒤 text를 타이핑하고 엔터를 침.
 
     activate 직후 바로 때리면 창이 아직 포커스를 못 받아서 글자가 흘리는 일이
-    있어서 0.12초를 쉬어줌. 엔터는 key code 36(return).
+    있어서 잠깐 쉬어줌. 엔터는 key code 36(return).
+
+    send_esc를 끄면 생성 중단 없이 입력만 함 — 크롬 사이드패널처럼 esc가
+    창을 닫아버리는 대상에 쓰라고 남겨둔 옵션.
     """
-    script = _SCRIPT.format(app=_escape(app), text=_escape(text))
+    script = _SCRIPT.format(app=_escape(app), text=_escape(text),
+                            esc=_ESC if send_esc else "")
     try:
         subprocess.run(
             ["osascript", "-e", script],

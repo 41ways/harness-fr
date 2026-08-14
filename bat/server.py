@@ -57,6 +57,7 @@ class Hub:
         self.heckler = heckler
         self.target_app = target_app
         self.armed = False        # 진짜 재촉(키스트로크) 스위치. 기본 꺼짐
+        self.send_esc = True      # esc 선행 여부 (크롬 사이드패널은 꺼야 함)
         self.swings = 0
         self.combo = 0
         self._last_swing_at = 0.0
@@ -209,11 +210,12 @@ class Hub:
         """터미널 타이핑과 AI 반응을 백그라운드에서 처리."""
         if self.armed:
             try:
-                nag.type_into(self.target_app, typed)
+                nag.type_into(self.target_app, typed, self.send_esc)
                 # 성공도 알려줘야 함 — 조용하면 꽂힌 건지 앱 이름이 틀린 건지
                 # 구분이 안 돼서 "왜 안 되지"로 시간을 태우게 됨
                 self.publish({
                     "type": "nag_sent", "app": self.target_app, "typed": typed,
+                    "esc": self.send_esc,
                 })
             except nag.NagError as e:
                 self.armed = False
@@ -233,6 +235,7 @@ class Hub:
                 "swings": self.swings,
                 "combo": self.combo,
                 "armed": self.armed,
+                "esc": self.send_esc,
                 "target": self.target_app,
                 "live_ai": self.heckler.live,
                 "effort": effort,
@@ -409,6 +412,8 @@ class Handler(BaseHTTPRequestHandler):
         elif path == "/arm":
             data = self._read_json()
             self.hub.armed = bool(data.get("on"))
+            if "esc" in data:
+                self.hub.send_esc = bool(data.get("esc"))
             target = data.get("target")
             if isinstance(target, str) and target.strip():
                 self.hub.target_app = target.strip()

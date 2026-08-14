@@ -196,7 +196,8 @@
       <label><input type="checkbox" id="arm"> 실제로 타이핑해서 인터럽트</label>
       <input type="text" id="target" list="apps" placeholder="앱 선택" spellcheck="false">
       <datalist id="apps"></datalist>
-      <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 <b>esc로 생성을 끊고</b> 재촉을 친 뒤 엔터를 누름. 지금 떠 있는 앱 중에서 고르면 됨.</div>
+      <label style="margin-top:8px"><input type="checkbox" id="esc" checked> esc로 먼저 중단</label>
+      <div class="warn" id="warn">켜면 스윙마다 저 앱을 앞으로 끌어와 재촉을 친 뒤 엔터를 누름. 크롬 사이드패널을 노리면 대상은 <b>Google Chrome</b>, esc는 끄고, 패널 입력칸을 한 번 클릭해 커서를 둬야 함.</div>
     </div>
 
     <div class="card">
@@ -631,6 +632,7 @@
 
   function onState(s) {
     $("arm").checked = s.armed;
+    $("esc").checked = s.esc !== false;
     if (!$("target").matches(":focus")) { $("target").value = s.target; }
     $("aimode").textContent = s.live_ai ? "Claude" : "내장 대사";
     $("hooked").textContent = s.hooked ? s.hooked + " ✓" : "안 붙음";
@@ -663,7 +665,7 @@
       add("note", "  ⎿ " + ev.app + "에 esc + \"" + ev.typed + "\" 침");
       $("warn").textContent = ev.app + "에 재촉 꽂히는 중 ✓";
       $("warn").className = "warn";
-      logNag("🖥 " + ev.app, "esc + " + ev.typed, true);
+      logNag("🖥 " + ev.app, (ev.esc ? "esc + " : "") + ev.typed, true);
     }
     else if (ev.type === "ext_report") {
       // 크롬 확장이 claude.ai에서 실제로 한 일
@@ -686,10 +688,12 @@
     fetch("/arm", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ on: $("arm").checked, target: $("target").value })
+      body: JSON.stringify({ on: $("arm").checked, target: $("target").value,
+                             esc: $("esc").checked })
     });
   }
   $("arm").addEventListener("change", pushArm);
+  $("esc").addEventListener("change", pushArm);
   $("target").addEventListener("change", pushArm);
 
   function startTask() {
