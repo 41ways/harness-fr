@@ -272,6 +272,7 @@
       if (audio.state === "suspended") { audio.resume(); }
       $("sound").textContent = muted ? "🔇" : "🔊";
       $("sound").title = "누르면 음소거 전환";
+      loadHit();
     } catch (e) { audio = null; }
   }
   document.addEventListener("click", unlockAudio, { once: false });
@@ -440,30 +441,35 @@
     setTimeout(function () { $("scenecard").classList.remove("pow"); }, SCENE_MS);
   }
 
+  // 맞는 소리는 실제 효과음 파일. 합성음보다 훨씬 낫고, 미리 디코딩해두면
+  // 첫 타격도 안 늦음. 파일을 못 받아오면 예전 합성음으로 떨어짐
+  var hitBuf = null;
+
+  function loadHit() {
+    if (!audio || hitBuf) { return; }
+    fetch("/static/sfx/hit.mp3")
+      .then(function (r) { return r.arrayBuffer(); })
+      .then(function (b) { return audio.decodeAudioData(b); })
+      .then(function (buf) { hitBuf = buf; })
+      .catch(function (e) { console.warn("[clanker-bat] 효과음 로드 실패:", e); });
+  }
+
   function crack(strength) {
     if (!audio || muted) { return; }
-    var t = audio.currentTime;
     var power = Math.min(strength, 60) / 60;
-
-    // 타격음은 두 겹. (1) 아주 짧고 밝은 노이즈 = 나무가 부딪히는 순간
-    var dur = 0.05;
-    var buf = audio.createBuffer(1, Math.ceil(audio.sampleRate * dur), audio.sampleRate);
-    var data = buf.getChannelData(0);
-    for (var i = 0; i < data.length; i++) {
-      // 뒤로 갈수록 급격히 죽여서 "틱" 하는 트랜지언트를 만듦
-      data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / data.length, 2.5);
+    if (hitBuf) {
+      var src = audio.createBufferSource();
+      src.buffer = hitBuf;
+      // 세게 칠수록 크고 살짝 낮게 — 같은 소리도 묵직하게 들림
+      src.playbackRate.value = 1.08 - power * 0.16;
+      var g = audio.createGain();
+      g.gain.value = 0.45 + power * 0.55;
+      src.connect(g).connect(audio.destination);
+      src.start();
+      return;
     }
-    var src = audio.createBufferSource();
-    src.buffer = buf;
-    var hp = audio.createBiquadFilter();
-    hp.type = "highpass";
-    hp.frequency.value = 1400 + power * 2200;
-    var g1 = audio.createGain();
-    g1.gain.value = 0.25 + power * 0.5;
-    src.connect(hp).connect(g1).connect(audio.destination);
-    src.start(t);
-
-    // (2) 빠르게 떨어지는 저음 = 배트가 울리는 몸통
+    // 폴백: 예전 합성음 (짧은 트랜지언트 + 감쇠 저음)
+    var t = audio.currentTime;
     var osc = audio.createOscillator(), g2 = audio.createGain();
     osc.type = "triangle";
     osc.frequency.setValueAtTime(240 + power * 120, t);
@@ -471,8 +477,7 @@
     g2.gain.setValueAtTime(0.18 + power * 0.35, t);
     g2.gain.exponentialRampToValueAtTime(0.0001, t + 0.13);
     osc.connect(g2).connect(audio.destination);
-    osc.start(t);
-    osc.stop(t + 0.14);
+    osc.start(t); osc.stop(t + 0.14);
   }
 
   function add(cls, text) {

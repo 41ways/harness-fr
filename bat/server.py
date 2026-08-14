@@ -352,6 +352,7 @@ class Handler(BaseHTTPRequestHandler):
     _TYPES = {
         ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
         ".svg": "image/svg+xml", ".webp": "image/webp",
+        ".mp3": "audio/mpeg", ".wav": "audio/wav",
     }
 
     def _send_static(self, name):
