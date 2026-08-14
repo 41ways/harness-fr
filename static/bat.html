@@ -223,11 +223,18 @@
     if (navigator.vibrate) {
       // 패턴은 [진동, 멈춤, 진동, ...] ms 순서. 첫 값이 진동 길이라서
       // [0, n]으로 주면 0ms 울리고 끝나 아무것도 안 느껴짐 (여기서 한 번 틀림)
-      // 짧은 진동은 기기가 아예 무시하는 경우가 있어 25ms 아래로는 안 내려감
+      //
+      // 웹 진동 API에는 세기(진폭) 조절이 없음 — 길이만 조절 가능함.
+      // 그래서 체감을 올리려면 길게, 그리고 짧은 간격으로 여러 번 끊어 침.
+      // 끊어 치면 모터가 계속 재기동해서 한 번 길게 울리는 것보다 더 세게 느껴짐
       var pattern;
-      if (strength < 22) { pattern = [28]; }                        // 살짝
-      else if (strength < 45) { pattern = [50]; }                   // 제대로
-      else { pattern = [80, 35, 30, 30, 25]; }                      // 홈런 — 여운
+      if (strength < 22) {                                          // 살짝
+        pattern = [70];
+      } else if (strength < 45) {                                   // 제대로
+        pattern = [140, 30, 70];
+      } else {                                                      // 홈런
+        pattern = [220, 35, 110, 35, 90, 40, 70];
+      }
       var ok = navigator.vibrate(pattern);
       if (!ok) { note("진동 거부됨 (기기 설정 확인)"); }
       return;
