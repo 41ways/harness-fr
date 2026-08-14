@@ -48,10 +48,20 @@
     background: #221d18; color: #efe6d8; border: 1px solid #3a332a; border-radius: 50%;
   }
   #mute.off { opacity: .45; }
+  /* 잡기/내려놓기는 서로를 대체하는 버튼이라 화면에서 같은 자리를 씀.
+     각자 컨테이너 안에 두면 위쪽 내용 높이에 따라 위치가 튐 */
+  .action {
+    position: fixed; left: 50%; transform: translateX(-50%);
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 30px);
+    width: min(280px, 76vw); margin: 0; padding: 17px 0;
+  }
+  .action:active { transform: translateX(-50%) scale(.97); }
   #drop {
     background: transparent; color: var(--dim); border: 1px solid #3a332a;
-    font-size: 14px; font-weight: 500; padding: 12px 22px; margin-top: 22px;
+    font-size: 15px; font-weight: 500;
   }
+  /* 고정 버튼에 가리지 않게 본문 아래를 비움 */
+  #ready, #start { padding-bottom: 96px; }
 </style>
 </head>
 <body>
@@ -85,7 +95,7 @@
     <div class="last" id="last">휘두르면 됨</div>
     <div class="meter"><i id="meter"></i></div>
     <div class="hint" id="hint">폰을 빠따처럼 쥐고 휘두르면 됨.<br>세게 칠수록 세게 재촉함</div>
-    <button id="drop" type="button">빠따 내려놓기</button>
+    <button id="drop" type="button" class="action">빠따 내려놓기</button>
   </div>
 
   <!-- iOS 햅틱용. switch 체크박스를 토글하면 시스템 진동이 울려서 그걸 빌려 씀 -->
@@ -94,7 +104,7 @@
   <button id="mute" type="button" aria-label="소리 켜기/끄기">🔊</button>
 
   <div id="start">
-    <button id="go">빠따 잡기</button>
+    <button id="go" class="action">빠따 잡기</button>
     <div class="hint">아이폰은 센서 권한을 한 번 물어봄<br>허용해야 스윙이 잡힘</div>
     <div class="err hidden" id="err"></div>
   </div>
