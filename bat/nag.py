@@ -93,6 +93,23 @@ _SYSTEM = """너는 지금 코딩 작업을 하다가 사용자한테 야구 빠
 _MODEL = "claude-opus-5"
 
 
+def make_client():
+    # type: () -> object
+    """
+    anthropic sdk와 키가 둘 다 있을 때만 클라이언트를 만듦. 없으면 None.
+
+    자막용 Heckler와 실제로 일하는 Victim이 같은 클라이언트를 나눠 쓰라고
+    모듈 함수로 뺐음.
+    """
+    if not os.environ.get("ANTHROPIC_API_KEY"):
+        return None
+    try:
+        import anthropic
+    except ImportError:
+        return None
+    return anthropic.Anthropic()
+
+
 class Heckler:
     """
     스윙마다 '재촉당한 AI' 대사를 만들어주는 놈.
@@ -101,22 +118,10 @@ class Heckler:
     장난감 프로그램인데 네트워크 문제로 재미가 끊기면 안 되니까.
     """
 
-    def __init__(self, model=_MODEL):
-        # type: (str) -> None
+    def __init__(self, model=_MODEL, client=None):
+        # type: (str, object) -> None
         self.model = model
-        self._client = self._make_client()
-
-    @staticmethod
-    def _make_client():
-        # type: () -> object
-        """anthropic sdk와 키가 둘 다 있을 때만 클라이언트를 만듦."""
-        if not os.environ.get("ANTHROPIC_API_KEY"):
-            return None
-        try:
-            import anthropic
-        except ImportError:
-            return None
-        return anthropic.Anthropic()
+        self._client = client
 
     @property
     def live(self):

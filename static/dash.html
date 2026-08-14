@@ -43,6 +43,12 @@
   .user { background: #2c2723; color: #efe7da; padding: 2px 6px; margin: 6px 0 2px; border-radius: 3px; word-break: break-all; }
   .say { color: var(--fg); }
   .say::before { content: "⏺ "; color: var(--accent); }
+  .sys { color: #ffb07c; background: #2e1f16; padding: 3px 7px; margin: 6px 0; border-left: 2px solid var(--accent); border-radius: 2px; }
+  .turn { color: var(--dim); margin-top: 9px; }
+  .turn b { color: var(--accent); font-weight: 400; }
+  .speed { color: #8fd98f; }
+  .speed b { color: #b6f0b6; font-weight: 400; }
+  .note { color: #ffb07c; }
   .spin { color: var(--accent); margin-top: 8px; }
   .spin small { color: var(--dim); }
   .foot {
@@ -67,6 +73,14 @@
     width: 100%; margin-top: 9px; padding: 7px 9px; font: inherit;
     background: #171512; color: var(--fg); border: 1px solid var(--line); border-radius: 5px;
   }
+  button {
+    width: 100%; margin-top: 7px; padding: 8px; font: inherit; font-weight: 700;
+    background: var(--accent); color: #1b1917; border: 0; border-radius: 5px; cursor: pointer;
+  }
+  button:disabled { background: #3a352f; color: var(--dim); cursor: default; }
+  table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 11px; color: var(--dim); }
+  table td { padding: 2px 0; }
+  table td:last-child { text-align: right; color: #b6f0b6; }
   .warn { color: var(--dim); font-size: 11px; line-height: 1.6; margin-top: 9px; }
   .warn.bad { color: #ff9d85; }
   .qr { color: var(--dim); font-size: 11px; word-break: break-all; }
@@ -92,6 +106,23 @@
         <div><span>마지막 세기</span><b id="power">-</b></div>
         <div><span>AI 상태</span><b id="mental">멀쩡</b></div>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>속도 (실측)</h2>
+      <div class="rows">
+        <div><span>effort</span><b id="effort">-</b></div>
+        <div><span>fast mode</span><b id="fast">-</b></div>
+        <div><span>마지막 턴</span><b id="tps">-</b></div>
+      </div>
+      <table id="hist"></table>
+    </div>
+
+    <div class="card">
+      <h2>과제 시키기</h2>
+      <input type="text" id="task" placeholder="예: 재촉의 역사에 대해 조사해줘" spellcheck="false">
+      <button id="run">시작</button>
+      <div class="warn" id="taskwarn">진짜 Claude가 여러 턴에 걸쳐 수행함. 때릴 때마다 effort가 내려가고 대화에 재촉이 꽂힘.</div>
     </div>
 
     <div class="card">
@@ -171,11 +202,79 @@
   setInterval(tickSpinner, 200);
   setInterval(function () { wordAt += 1; }, 1400);
 
-  // 재촉이 없을 때도 혼자 일하는 척 — 툴 호출이 하나씩 흘러감
+  // 진짜 과제가 안 돌 때만 일하는 척 — 돌 때는 실제 출력이 그 자리를 채움
   setInterval(function () {
+    if (working) { return; }
     add("tool", "⏺ " + TOOLS[toolAt % TOOLS.length]);
     toolAt += 1;
   }, 5200);
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 진짜 AI 작업 렌더링
+  // ══════════════════════════════════════════════════════════════════════
+  var working = false, streamEl = null, turns = [];
+
+  function onWork(ev) {
+    if (ev.type === "work_task") {
+      working = true;
+      log.innerHTML = "";
+      spinEl = null;
+      turns = [];
+      $("hist").innerHTML = "";
+      add("user", "> " + ev.task);
+      return;
+    }
+    if (ev.type === "work_start") {
+      startedAt = Date.now();
+      streamEl = add("say", "");
+      $("effort").textContent = ev.effort;
+      $("fast").textContent = ev.fast ? "ON ⚡" : "off";
+      return;
+    }
+    if (ev.type === "work_delta") {
+      if (!streamEl) { streamEl = add("say", ""); }
+      streamEl.textContent += ev.text;
+      scroll();
+      return;
+    }
+    if (ev.type === "work_end") {
+      streamEl = null;
+      // 재촉이 실제로 속도를 올렸는지 확인할 수 있게 턴마다 실측치를 남김
+      var label = ev.effort + (ev.fast ? "+fast" : "");
+      turns.push({ label: label, tps: ev.tps });
+      add("speed", "  ⎿ " + label + " · " + ev.seconds + "s · " +
+                   ev.tokens + " tokens · " + ev.tps + " tok/s");
+      $("tps").textContent = ev.tps + " tok/s";
+      renderHist();
+      return;
+    }
+    if (ev.type === "work_nag") {
+      add("sys", "[system] " + ev.text);
+      return;
+    }
+    if (ev.type === "work_note") { add("note", "  ⎿ " + ev.text); return; }
+    if (ev.type === "work_error") {
+      working = false;
+      add("note", "  ⎿ 작업 실패: " + ev.message);
+      $("run").disabled = false;
+      return;
+    }
+    if (ev.type === "work_done") {
+      working = false;
+      streamEl = null;
+      var why = { finished: "과제 완료", turn_limit: "턴 한도 도달", refused: "거절됨" };
+      add("tool", "⏺ " + (why[ev.reason] || ev.reason));
+      $("run").disabled = false;
+    }
+  }
+
+  function renderHist() {
+    // 마지막 6턴만. 위에서 아래로 읽으면 재촉에 따라 tok/s가 어떻게 변했는지 보임
+    $("hist").innerHTML = turns.slice(-6).map(function (t, i) {
+      return "<tr><td>" + (turns.length - Math.min(6, turns.length) + i + 1) +
+             ". " + t.label + "</td><td>" + t.tps + " tok/s</td></tr>";
+    }).join("");
+  }
 
   // ══════════════════════════════════════════════════════════════════════
   // 스윙 반응
@@ -192,12 +291,17 @@
     $("mental").textContent =
       swings >= 13 ? "붕괴" : swings >= 7 ? "패닉" : swings >= 3 ? "당황" : "멀쩡";
 
+    if (ev.effort) { $("effort").textContent = ev.effort; }
+    $("fast").textContent = ev.fast ? "ON ⚡" : "off";
+
     // 영상처럼 재촉이 띄어쓰기 없이 계속 이어붙음
     queued += ev.typed;
     $("queue").textContent = queued;
     $("footHint").textContent = "press up to edit queued messages";
 
-    addInterrupt();
+    // 진짜 과제가 도는 중엔 인터럽트가 아니라 시스템 메시지로 꽂히므로
+    // (work_nag가 따로 뜸) 가짜 인터럽트 줄은 안 찍음
+    if (!working) { addInterrupt(); }
 
     var t = $("term");
     t.style.setProperty("--sx", ev.shake + "px");
@@ -207,6 +311,8 @@
   }
 
   function onReaction(ev) {
+    // 진짜 AI가 일하는 중이면 그 출력이 곧 반응이라, 자막 대사는 안 끼워넣음
+    if (working) { return; }
     if (queued) {
       add("user", "> " + queued);
       queued = "";
@@ -221,6 +327,14 @@
     if (!$("target").matches(":focus")) { $("target").value = s.target; }
     $("aimode").textContent = s.live_ai ? "Claude" : "내장 대사";
     $("swings").textContent = s.swings;
+    $("effort").textContent = s.effort;
+    $("fast").textContent = s.fast ? "ON ⚡" : "off";
+    working = s.working;
+    $("run").disabled = !s.can_work || s.working;
+    if (!s.can_work) {
+      $("taskwarn").textContent = "ANTHROPIC_API_KEY가 없어서 진짜 AI는 못 돌림. 화면 연출만 동작함.";
+      $("taskwarn").className = "warn bad";
+    }
   }
 
   // ══════════════════════════════════════════════════════════════════════
@@ -232,6 +346,7 @@
     if (ev.type === "swing") { onSwing(ev); }
     else if (ev.type === "reaction") { onReaction(ev); }
     else if (ev.type === "state") { onState(ev.state); }
+    else if (ev.type.indexOf("work_") === 0) { onWork(ev); }
     else if (ev.type === "nag_error") {
       $("arm").checked = false;
       $("warn").textContent = ev.message;
@@ -248,6 +363,27 @@
   }
   $("arm").addEventListener("change", pushArm);
   $("target").addEventListener("change", pushArm);
+
+  function startTask() {
+    var task = $("task").value.trim();
+    if (!task) { return; }
+    $("run").disabled = true;
+    fetch("/task", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ task: task })
+    }).then(function (r) { return r.json(); }).then(function (data) {
+      if (data.error) {
+        $("taskwarn").textContent = data.error;
+        $("taskwarn").className = "warn bad";
+        $("run").disabled = false;
+      }
+    });
+  }
+  $("run").addEventListener("click", startTask);
+  $("task").addEventListener("keydown", function (e) {
+    if (e.key === "Enter") { startTask(); }
+  });
 
   $("url").textContent = location.origin + "  ← 아이폰 사파리에서 열기";
   add("tool", "⏺ " + TOOLS[toolAt++]);

@@ -21,7 +21,7 @@ import os
 import socket
 import sys
 
-from bat import cert, nag, server
+from bat import cert, nag, server, victim
 
 CERT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "certs")
 
@@ -68,8 +68,11 @@ def main():
     host = args.host or lan_ip()
 
     certfile, keyfile = cert.ensure_cert(host, CERT_DIR)
-    heckler = nag.Heckler(model=args.model)
+    client = nag.make_client()
+    heckler = nag.Heckler(model=args.model, client=client)
     httpd = server.build(host, args.port, certfile, keyfile, heckler, args.target)
+    # Victim은 hub를 참조해야 해서 서버를 만든 뒤에 붙임
+    httpd.hub.victim = victim.Victim(httpd.hub, args.model, client)
 
     base = f"https://{host}:{args.port}"
     ai_mode = f"Claude {args.model}" if heckler.live else "내장 대사 (api 키 없음)"

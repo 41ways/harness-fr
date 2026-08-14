@@ -26,7 +26,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import nag, taunt
+from . import nag, taunt, victim
 
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 
@@ -56,6 +56,10 @@ class Hub:
         self.swings = 0
         self.combo = 0
         self._last_swing_at = 0.0
+        self.victim = None        # 실제로 일하는 AI. run.py에서 붙여줌
+        self._level = 0           # 압박 단계 (taunt.PRESSURE 인덱스)
+        self._level_at = time.time()
+        self._pending = []        # 다음 턴에 꽂을 재촉 문장들
 
     # ── 구독 관리 ────────────────────────────────────────────────────────
     def subscribe(self):
@@ -82,6 +86,34 @@ class Hub:
             except queue.Full:
                 pass
 
+    # ── 압박 단계 ────────────────────────────────────────────────────────
+    def pressure(self):
+        # type: () -> tuple
+        """
+        지금 걸어야 할 (effort, fast mode)를 돌려줌.
+
+        회복은 읽는 시점에 계산함 — 타이머 스레드를 하나 더 돌리는 것보다
+        단순하고, 어차피 이 값은 다음 턴 시작할 때만 필요함.
+        """
+        with self._lock:
+            self._decay_locked()
+            return taunt.pressure(self._level)
+
+    def _decay_locked(self):
+        """재촉이 끊긴 시간만큼 압박 단계를 되돌림. 락을 잡은 채로 호출할 것."""
+        idle = time.time() - self._level_at
+        steps = int(idle // taunt.RECOVER_AFTER)
+        if steps > 0 and self._level > 0:
+            self._level = max(0, self._level - steps)
+            self._level_at = time.time()
+
+    def drain_nags(self):
+        # type: () -> list
+        """밀려 있던 재촉 문장을 꺼내가고 비움."""
+        with self._lock:
+            pending, self._pending = self._pending, []
+        return pending
+
     # ── 스윙 처리 ────────────────────────────────────────────────────────
     def swing(self, strength):
         # type: (float) -> dict
@@ -101,6 +133,15 @@ class Hub:
             self._last_swing_at = now
             swings, combo = self.swings, self.combo
 
+            # 한 대 = 압박 한 칸. 회복분을 먼저 반영하고 올려야 순서가 안 꼬임
+            self._decay_locked()
+            self._level = min(self._level + 1, len(taunt.PRESSURE) - 1)
+            self._level_at = now
+            effort, fast = taunt.pressure(self._level)
+            # 일하는 중일 때만 대화에 꽂음. 안 돌 때 쌓아두면 나중에 뜬금없이 나감
+            if self.victim is not None and self.victim.busy:
+                self._pending.append(taunt.system_nag(swings))
+
         tier = taunt.classify(strength)
         line = taunt.pick(tier)
         event = {
@@ -110,6 +151,8 @@ class Hub:
             "swings": swings,
             "combo": combo,
             "words": taunt.spinner_words(swings),
+            "effort": effort,
+            "fast": fast,
         }
         event.update(line)
 
@@ -139,6 +182,7 @@ class Hub:
 
     def state(self):
         # type: () -> dict
+        effort, fast = self.pressure()
         with self._lock:
             return {
                 "swings": self.swings,
@@ -146,6 +190,10 @@ class Hub:
                 "armed": self.armed,
                 "target": self.target_app,
                 "live_ai": self.heckler.live,
+                "effort": effort,
+                "fast": fast,
+                "can_work": self.victim is not None and self.victim.ready,
+                "working": self.victim is not None and self.victim.busy,
             }
 
 
@@ -232,6 +280,24 @@ class Handler(BaseHTTPRequestHandler):
                 self._send_json({"error": "strength가 숫자가 아님"}, code=400)
                 return
             self._send_json(self.hub.swing(strength))
+        elif path == "/task":
+            data = self._read_json()
+            task = data.get("task")
+            if not isinstance(task, str) or not task.strip():
+                self._send_json({"error": "과제 내용이 비어 있음"}, code=400)
+                return
+            hub = self.hub
+            if hub.victim is None:
+                self._send_json({"error": "작업용 AI가 준비 안 됨"}, code=400)
+                return
+            try:
+                hub.victim.start(task.strip())
+            except victim.VictimError as e:
+                self._send_json({"error": str(e)}, code=409)
+                return
+            hub.publish({"type": "work_task", "task": task.strip()})
+            hub.publish({"type": "state", "state": hub.state()})
+            self._send_json(hub.state())
         elif path == "/arm":
             data = self._read_json()
             self.hub.armed = bool(data.get("on"))
