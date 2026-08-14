@@ -115,19 +115,19 @@
             <stop offset="1" stop-color="#7a4c22"/>
           </linearGradient>
           <radialGradient id="vig" cx="50%" cy="45%" r="62%">
-            <stop offset="55%" stop-color="#1b1917" stop-opacity="0"/>
-            <stop offset="100%" stop-color="#1b1917" stop-opacity="1"/>
+            <stop offset="70%" stop-color="#1b1917" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#1b1917" stop-opacity=".85"/>
           </radialGradient>
         </defs>
 
         <!-- 로봇은 실제 사진(CB2). 그림으로 흉내내는 것보다 밈이 훨씬 잘 삶.
              맞을 때 이 <g>를 통째로 흔들고 눌러서 반응을 만듦 -->
         <g id="robot">
-          <image id="robotimg" href="/static/robots/1.jpg" x="52" y="14" width="104" height="131"
+          <image id="robotimg" href="/static/robots/1.jpg" x="0" y="0" width="240" height="150"
                  preserveAspectRatio="xMidYMid slice"/>
         </g>
         <!-- 사진 가장자리를 카드 배경으로 자연스럽게 떨어뜨림 -->
-        <rect x="52" y="14" width="104" height="131" fill="url(#vig)" pointer-events="none"/>
+        <rect x="0" y="0" width="240" height="150" fill="url(#vig)" pointer-events="none"/>
 
         <!-- 배트. 손잡이 끝(100,195)이 회전축 -->
         <g id="dbat">
@@ -149,7 +149,7 @@
           <line x1="-12" y1="-12" x2="-23" y2="-23"/><line x1="12" y1="-12" x2="23" y2="-23"/>
           <line x1="-14" y1="8" x2="-26" y2="15"/><line x1="14" y1="8" x2="26" y2="15"/>
         </g>
-        <text id="kang" x="46" y="44" opacity="0" font-size="30" font-weight="700"
+        <text id="kang" x="18" y="40" opacity="0" font-size="30" font-weight="700"
               fill="#ffd9a0" font-family="ui-monospace, Menlo, monospace">깡!</text>
       </svg>
     </div>
@@ -258,13 +258,13 @@
   // 회전축은 화면 오른쪽 밖. 회전만으로는 배트가 임팩트 직전에야 프레임에
   // 들어와서 스윙이 안 보임 — 그래서 회전과 같이 x로 밀어 넣음. 대기 중엔
   // 완전히 화면 밖(offset +96)에 있다가 내리치면서 오른쪽에서 훑고 들어옴
-  var PIVOT_X = 250, PIVOT_Y = 54, BAT_SCALE = 0.695, ENTER_X = 96;
+  var PIVOT_X = 258, PIVOT_Y = 40, BAT_SCALE = 0.768, ENTER_X = 96;
   // 사진 6장을 머리가 같은 자리에 오도록 정규화 크롭해서, 머리 타원을
-  // (중심 104,57.2 / rx21 ry27.5)로 고정함. 배럴 끝이 그 표면에 처음 닿는
-  // 각이 -86.3°이고 그 전까지는 항상 바깥. 더 내리면 머리를 뚫고 지나가 보임
-  var IMPACT_DEG = -86.3;
-  var HEAD_X = 123.1, HEAD_Y = 45.8;      // 그 순간 배럴 끝 = 맞는 지점
-  var HEAD_CX = 104, HEAD_CY = 57.2;      // 머리 중심 — 흔들림의 회전축
+  // (중심 91,75 / rx30.4 ry43.5)로 고정함. 배럴 끝이 그 표면에 처음 닿는
+  // 각이 -96.2°이고 그 전까지는 항상 바깥. 더 내리면 머리를 뚫고 지나가 보임
+  var IMPACT_DEG = -96.2;
+  var HEAD_X = 118.3, HEAD_Y = 55.2;      // 그 순간 배럴 끝 = 맞는 지점
+  var HEAD_CX = 91, HEAD_CY = 75;      // 머리 중심 — 흔들림의 회전축
   var sceneAt = -1e9, scenePow = 0;
 
   function ease(x) { return 1 - Math.pow(1 - x, 3); }
@@ -299,13 +299,8 @@
       "translate(" + px.toFixed(1) + "," + PIVOT_Y + ") scale(" + BAT_SCALE + ") rotate(" +
       (idle ? 34 : batAngle(t)).toFixed(1) + ") translate(-100,-195)");
 
-    // 일하는 티: 타이핑하는 팔이 계속 까딱거림
-    var bob = Math.sin(now / 110) * 1.6;
-    arm.setAttribute("transform", "translate(0," + bob.toFixed(2) + ")");
-
     if (idle) {
       robot.setAttribute("transform", "translate(0,0)");
-      head.setAttribute("transform", "translate(0,0)");
       burst.setAttribute("opacity", 0);
       kang.setAttribute("opacity", 0);
       return;
@@ -348,10 +343,17 @@
     kang.setAttribute("opacity", (1 - g).toFixed(2));
     kang.setAttribute("transform", "translate(0," + (-g * 14).toFixed(1) + ") scale(" +
       (0.75 + g * 0.4).toFixed(2) + ")");
-    kang.setAttribute("transform-origin", "60 36");
+    kang.setAttribute("transform-origin", "32 32");
   }
 
-  function sceneLoop() { drawScene(performance.now()); requestAnimationFrame(sceneLoop); }
+  // drawScene에서 예외가 한 번 나면 rAF가 재등록되지 않아 애니메이션이
+  // 통째로 죽어버림 (실제로 한 번 당함). 예외를 잡아서 루프는 살려두고
+  // 원인만 콘솔에 남김
+  function sceneLoop() {
+    try { drawScene(performance.now()); }
+    catch (e) { console.error("[clanker-bat] 장면 그리기 실패:", e); }
+    requestAnimationFrame(sceneLoop);
+  }
   requestAnimationFrame(sceneLoop);
 
   // ── 로봇 단계 ─────────────────────────────────────────────────────────
