@@ -1,4 +1,4 @@
-# clanker-bat
+# clanker-bat — 깡! 깡통 괴롭히기
 
 야구 빠따를 휘둘러서 AI를 재촉하는 프로그램.
 
