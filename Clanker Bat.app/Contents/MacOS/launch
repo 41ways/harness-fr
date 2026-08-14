@@ -1,0 +1,42 @@
+#!/bin/bash
+# 번들이 리포 안에 있으므로 세 단계 위가 리포 루트
+ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+cd "$ROOT" || exit 1
+
+PY="$(command -v python3 || true)"
+if [ -z "$PY" ]; then
+  osascript -e 'display alert "python3이 없음" message "Xcode 명령줄 도구를 설치해줘: xcode-select --install"'
+  exit 1
+fi
+
+up() { curl -sk -o /dev/null --max-time 1 "https://127.0.0.1:8443/state"; }
+
+STARTED=0
+if ! up; then
+  "$PY" run.py > /tmp/clanker-bat.log 2>&1 &
+  STARTED=$!
+  for _ in $(seq 1 60); do up && break; sleep 0.25; done
+fi
+
+if ! up; then
+  # 따옴표가 섞이면 osascript가 깨져서 미리 제거함
+  ERR=$(tail -3 /tmp/clanker-bat.log | tr -d '"')
+  osascript -e "display alert \"서버가 안 뜸\" message \"$ERR\""
+  exit 1
+fi
+
+IP="$(ipconfig getifaddr en0 2>/dev/null || ipconfig getifaddr en1 2>/dev/null || echo 127.0.0.1)"
+open "https://$IP:8443/dash"
+
+osascript <<OSA
+display dialog "빠따 서버가 돌고 있어.
+
+아이폰(빠따):
+https://$IP:8443
+
+맥(대시보드)은 브라우저에 열어놨어." ¬
+  with title "Clanker Bat" buttons {"종료"} default button "종료" with icon note
+OSA
+
+# 이 앱이 띄운 서버만 정리함. 원래 돌고 있던 걸 껐다가 남의 작업을 끊으면 곤란
+if [ "$STARTED" != "0" ]; then kill "$STARTED" 2>/dev/null || true; fi

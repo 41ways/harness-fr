@@ -36,6 +36,8 @@
   }
   .dot { width: 10px; height: 10px; border-radius: 50%; background: #3d3831; }
   #sound { margin-left: auto; cursor: pointer; user-select: none; }
+  #stage { width: 100%; height: auto; display: block; margin-top: 4px; }
+  #scenecard.pow { border-color: var(--accent); }
   .log { flex: 1; overflow-y: auto; padding: 12px 14px; white-space: pre-wrap; word-break: break-word; }
   .log > div { margin-bottom: 2px; }
   .tool { color: var(--dim); }
@@ -79,6 +81,8 @@
     background: var(--accent); color: #1b1917; border: 0; border-radius: 5px; cursor: pointer;
   }
   button:disabled { background: #3a352f; color: var(--dim); cursor: default; }
+  button.ghost { background: transparent; color: var(--dim); border: 1px solid var(--line); font-weight: 400; }
+  button.ghost:hover { color: var(--fg); border-color: var(--dim); }
   table { width: 100%; margin-top: 10px; border-collapse: collapse; font-size: 11px; color: var(--dim); }
   table td { padding: 2px 0; }
   table td:last-child { text-align: right; color: #b6f0b6; }
@@ -101,6 +105,56 @@
   </div>
 
   <div class="side">
+    <div class="card" id="scenecard">
+      <h2>일하는 로봇</h2>
+      <svg id="stage" viewBox="0 0 240 150">
+        <defs>
+          <linearGradient id="dwood" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" stop-color="#8a5a2b"/>
+            <stop offset=".42" stop-color="#d8a163"/>
+            <stop offset=".72" stop-color="#b87a3d"/>
+            <stop offset="1" stop-color="#7a4c22"/>
+          </linearGradient>
+          <radialGradient id="vig" cx="50%" cy="45%" r="62%">
+            <stop offset="55%" stop-color="#1b1917" stop-opacity="0"/>
+            <stop offset="100%" stop-color="#1b1917" stop-opacity="1"/>
+          </radialGradient>
+        </defs>
+
+        <!-- 로봇은 실제 사진(CB2). 그림으로 흉내내는 것보다 밈이 훨씬 잘 삶.
+             맞을 때 이 <g>를 통째로 흔들고 눌러서 반응을 만듦 -->
+        <g id="robot">
+          <image id="robotimg" href="/static/robots/1.jpg" x="52" y="14" width="104" height="131"
+                 preserveAspectRatio="xMidYMid slice"/>
+        </g>
+        <!-- 사진 가장자리를 카드 배경으로 자연스럽게 떨어뜨림 -->
+        <rect x="52" y="14" width="104" height="131" fill="url(#vig)" pointer-events="none"/>
+
+        <!-- 배트. 손잡이 끝(100,195)이 회전축 -->
+        <g id="dbat">
+          <path d="M100 12 C109 12 114 21 114 33 C114 55 114 62 112 76
+                   C110 100 106 122 105 146 C105 156 104 166 104 172
+                   C104 178 110 181 110 186 C110 191 105 195 100 195
+                   C95 195 90 191 90 186 C90 181 96 178 96 172
+                   C96 166 95 156 95 146 C94 122 90 100 88 76
+                   C86 62 86 55 86 33 C86 21 91 12 100 12 Z"
+                fill="url(#dwood)" stroke="#4a2c12" stroke-width="3.5" stroke-linejoin="round"/>
+          <path d="M95 160 H105 M95 168 H105 M95 176 H105"
+                stroke="#00000033" stroke-width="3" stroke-linecap="round"/>
+        </g>
+
+        <!-- 맞는 순간: 터지는 선 + "깡!" -->
+        <g id="burst" opacity="0" stroke="#ffd9a0" stroke-width="3" stroke-linecap="round">
+          <line x1="-16" y1="0" x2="-30" y2="0"/><line x1="16" y1="0" x2="30" y2="0"/>
+          <line x1="0" y1="-16" x2="0" y2="-30"/>
+          <line x1="-12" y1="-12" x2="-23" y2="-23"/><line x1="12" y1="-12" x2="23" y2="-23"/>
+          <line x1="-14" y1="8" x2="-26" y2="15"/><line x1="14" y1="8" x2="26" y2="15"/>
+        </g>
+        <text id="kang" x="46" y="44" opacity="0" font-size="30" font-weight="700"
+              fill="#ffd9a0" font-family="ui-monospace, Menlo, monospace">깡!</text>
+      </svg>
+    </div>
+
     <div class="card">
       <h2>맞은 횟수</h2>
       <div class="big"><span id="swings">0</span><span>대</span></div>
@@ -108,8 +162,10 @@
       <div class="rows" style="margin-top:11px">
         <div><span>연타</span><b id="combo">0</b></div>
         <div><span>마지막 세기</span><b id="power">-</b></div>
+        <div><span>로봇 단계</span><b id="stage">1 / 6</b></div>
         <div><span>AI 상태</span><b id="mental">멀쩡</b></div>
       </div>
+      <button id="reset" class="ghost">초기화</button>
     </div>
 
     <div class="card">
@@ -179,18 +235,150 @@
   // 폰은 휘두르는 쪽이라 "휭", 맥은 맞는 쪽이라 "딱". 브라우저는 사용자가
   // 한 번 클릭하기 전엔 소리를 안 내줘서 첫 클릭에 오디오를 염
   // ══════════════════════════════════════════════════════════════════════
-  var audio = null, muted = false;
+  var audio = null, muted = localStorage.getItem("clankerDashMuted") === "1";
 
   function unlockAudio() {
     if (audio) { return; }
     try {
       audio = new (window.AudioContext || window.webkitAudioContext)();
       if (audio.state === "suspended") { audio.resume(); }
-      $("sound").textContent = "🔊";
-      $("sound").title = "소리 켜짐 — 누르면 음소거";
+      $("sound").textContent = muted ? "🔇" : "🔊";
+      $("sound").title = "누르면 음소거 전환";
     } catch (e) { audio = null; }
   }
   document.addEventListener("click", unlockAudio, { once: false });
+
+  // ══════════════════════════════════════════════════════════════════════
+  // 로봇 때리는 장면
+  //
+  // 배트는 손잡이 끝(100,195)을 축으로 돌림. 임팩트 각도(-98°)에서 배럴 끝이
+  // 로봇 정수리에 정확히 닿도록 축 위치와 배율을 역산해서 맞춤 — 눈대중으로
+  // 잡으면 배트가 머리를 통과하거나 허공을 침
+  // ══════════════════════════════════════════════════════════════════════
+  var SCENE_MS = 820, CONTACT = 0.32;
+  // 회전축은 화면 오른쪽 밖. 회전만으로는 배트가 임팩트 직전에야 프레임에
+  // 들어와서 스윙이 안 보임 — 그래서 회전과 같이 x로 밀어 넣음. 대기 중엔
+  // 완전히 화면 밖(offset +96)에 있다가 내리치면서 오른쪽에서 훑고 들어옴
+  var PIVOT_X = 250, PIVOT_Y = 54, BAT_SCALE = 0.695, ENTER_X = 96;
+  // 사진 6장을 머리가 같은 자리에 오도록 정규화 크롭해서, 머리 타원을
+  // (중심 104,57.2 / rx21 ry27.5)로 고정함. 배럴 끝이 그 표면에 처음 닿는
+  // 각이 -86.3°이고 그 전까지는 항상 바깥. 더 내리면 머리를 뚫고 지나가 보임
+  var IMPACT_DEG = -86.3;
+  var HEAD_X = 123.1, HEAD_Y = 45.8;      // 그 순간 배럴 끝 = 맞는 지점
+  var HEAD_CX = 104, HEAD_CY = 57.2;      // 머리 중심 — 흔들림의 회전축
+  var sceneAt = -1e9, scenePow = 0;
+
+  function ease(x) { return 1 - Math.pow(1 - x, 3); }
+  function mix(a, b, x) { return a + (b - a) * x; }
+  function seg(t, a, b) { return Math.max(0, Math.min(1, (t - a) / (b - a))); }
+
+  function batAngle(t) {
+    if (t < 0.14) { return mix(34, 44, ease(seg(t, 0, 0.14))); }         // 치켜듦
+    if (t < CONTACT) { return mix(44, IMPACT_DEG, seg(t, 0.14, CONTACT)); } // 내리침
+    // 맞은 뒤엔 더 내려가지 않음 — 머리에 눌린 채 살짝 튕겼다가 들림
+    if (t < 0.46) { return IMPACT_DEG + ease(seg(t, CONTACT, 0.46)) * 5; }
+    return mix(IMPACT_DEG + 5, 34, ease(seg(t, 0.46, 1)));               // 복귀
+  }
+
+  function batOffset(t) {
+    // 대기/복귀 땐 화면 밖, 내리치는 동안 0으로 들어옴
+    if (t < 0) { return ENTER_X; }
+    if (t < CONTACT) { return mix(ENTER_X, 0, ease(seg(t, 0, CONTACT))); }
+    if (t < 0.55) { return 0; }
+    return mix(0, ENTER_X, ease(seg(t, 0.55, 1)));
+  }
+
+  function drawScene(now) {
+    var t = (now - sceneAt) / SCENE_MS;
+    var bat = $("dbat"), robot = $("robot");
+    var burst = $("burst"), kang = $("kang");
+    if (!bat) { return; }
+
+    var idle = t < 0 || t > 1;
+    var px = PIVOT_X + (idle ? ENTER_X : batOffset(t));
+    bat.setAttribute("transform",
+      "translate(" + px.toFixed(1) + "," + PIVOT_Y + ") scale(" + BAT_SCALE + ") rotate(" +
+      (idle ? 34 : batAngle(t)).toFixed(1) + ") translate(-100,-195)");
+
+    // 일하는 티: 타이핑하는 팔이 계속 까딱거림
+    var bob = Math.sin(now / 110) * 1.6;
+    arm.setAttribute("transform", "translate(0," + bob.toFixed(2) + ")");
+
+    if (idle) {
+      robot.setAttribute("transform", "translate(0,0)");
+      head.setAttribute("transform", "translate(0,0)");
+      burst.setAttribute("opacity", 0);
+      kang.setAttribute("opacity", 0);
+      return;
+    }
+
+    if (t < CONTACT) {
+      // 아직 안 맞음 — 태평하게 일하는 중
+      burst.setAttribute("opacity", 0);
+      kang.setAttribute("opacity", 0);
+      return;
+    }
+
+    // 맞은 뒤 반응. 사진이라 표정을 못 바꾸니 몸 전체의 움직임으로 표현함
+    //  - 아래로 쿡 눌렸다가 감쇠 진동으로 올라옴
+    //  - 좌우로 부르르 떨림 (맞은 충격)
+    //  - 세로로 눌렸다 늘어남 (스쿼시)
+    //  - 머리를 축으로 살짝 기울어짐
+    var k = seg(t, CONTACT, 1);
+    var decay = Math.exp(-k * 5);
+    var drop = decay * (7 + scenePow * 8);
+    var shake = Math.exp(-k * 9) * Math.cos(k * 46) * (3 + scenePow * 4);
+    var squash = Math.exp(-k * 5.5) * Math.cos(k * 20) * (0.05 + scenePow * 0.06);
+    var tiltDeg = Math.exp(-k * 7) * Math.cos(k * 30) * (4 + scenePow * 5);
+
+    robot.setAttribute("transform",
+      "translate(" + shake.toFixed(2) + "," + drop.toFixed(2) + ") " +
+      "rotate(" + tiltDeg.toFixed(2) + " " + HEAD_CX + " " + HEAD_CY + ") " +
+      "translate(" + HEAD_CX + "," + HEAD_CY + ") " +
+      "scale(" + (1 + squash).toFixed(3) + "," + (1 - squash).toFixed(3) + ") " +
+      "translate(" + (-HEAD_CX) + "," + (-HEAD_CY) + ")");
+
+    var b = seg(t, CONTACT, CONTACT + 0.18);
+    burst.setAttribute("opacity", (1 - b).toFixed(2));
+    burst.setAttribute("transform",
+      "translate(" + HEAD_X + "," + HEAD_Y + ") scale(" +
+      (0.5 + b * (0.9 + scenePow * 0.8)).toFixed(2) + ")");
+
+    // 깡! 은 살짝 늦게 떠서 위로 밀려 올라감
+    var g = seg(t, CONTACT, CONTACT + 0.42);
+    kang.setAttribute("opacity", (1 - g).toFixed(2));
+    kang.setAttribute("transform", "translate(0," + (-g * 14).toFixed(1) + ") scale(" +
+      (0.75 + g * 0.4).toFixed(2) + ")");
+    kang.setAttribute("transform-origin", "60 36");
+  }
+
+  function sceneLoop() { drawScene(performance.now()); requestAnimationFrame(sceneLoop); }
+  requestAnimationFrame(sceneLoop);
+
+  // ── 로봇 단계 ─────────────────────────────────────────────────────────
+  // 맞을수록 다른 사진으로 바뀜. 파일이 아직 없는 단계는 건너뛰고 직전 사진을
+  // 유지함 — 6장을 다 채우기 전에도 동작하게
+  var curStage = 0;
+
+  function setStage(stage, max) {
+    $("stage").textContent = stage + " / " + (max || 6);
+    if (stage === curStage) { return; }
+    var url = "/static/robots/" + stage + ".jpg";
+    var probe = new Image();
+    probe.onload = function () {
+      curStage = stage;
+      $("robotimg").setAttribute("href", url);
+    };
+    probe.onerror = function () { curStage = stage; };   // 없으면 그대로 둠
+    probe.src = url;
+  }
+
+  function playHit(strength) {
+    sceneAt = performance.now();
+    scenePow = Math.min(strength, 60) / 60;
+    $("scenecard").classList.add("pow");
+    setTimeout(function () { $("scenecard").classList.remove("pow"); }, SCENE_MS);
+  }
 
   function crack(strength) {
     if (!audio || muted) { return; }
@@ -342,7 +530,10 @@
   // 스윙 반응
   // ══════════════════════════════════════════════════════════════════════
   function onSwing(ev) {
-    crack(ev.strength);
+    // 소리와 그림이 같은 순간에 시작해야 "맞았다"로 읽힘. 사운드는 임팩트
+    // 시점에 맞춰 지연시킴 — 배트가 아직 오는 중에 딱 소리가 나면 어긋나 보임
+    playHit(ev.strength);
+    setTimeout(function () { crack(ev.strength); }, SCENE_MS * CONTACT);
     swings = ev.swings;
     startedAt = Date.now();
     $("swings").textContent = swings;
@@ -356,6 +547,7 @@
 
     if (ev.effort) { $("effort").textContent = ev.effort; }
     $("fast").textContent = ev.fast ? "ON ⚡" : "off";
+    if (ev.stage) { setStage(ev.stage); }
 
     // 영상처럼 재촉이 띄어쓰기 없이 계속 이어붙음
     queued += ev.typed;
@@ -385,6 +577,16 @@
     add("say", ev.text);
   }
 
+  function onReset() {
+    // 로봇도 1단계로 되돌림. curStage를 0으로 밀어야 setStage가 다시 갈아끼움
+    swings = 0; curStage = 0;
+    $("power").textContent = "-";
+    $("gauge").style.width = "0";
+    $("mental").textContent = "멀쩡";
+    queued = ""; $("queue").textContent = "";
+    setStage(1);
+  }
+
   function onState(s) {
     $("arm").checked = s.armed;
     if (!$("target").matches(":focus")) { $("target").value = s.target; }
@@ -393,6 +595,8 @@
     $("swings").textContent = s.swings;
     $("effort").textContent = s.effort;
     $("fast").textContent = s.fast ? "ON ⚡" : "off";
+    if (s.stage) { setStage(s.stage, s.stage_max); }
+    $("combo").textContent = s.combo;
     working = s.working;
     $("run").disabled = !s.can_work || s.working;
     if (!s.can_work) {
@@ -410,6 +614,7 @@
     if (ev.type === "swing") { onSwing(ev); }
     else if (ev.type === "reaction") { onReaction(ev); }
     else if (ev.type === "state") { onState(ev.state); }
+    else if (ev.type === "reset") { onReset(); }
     else if (ev.type.indexOf("work_") === 0) { onWork(ev); }
     else if (ev.type === "nag_sent") {
       // 실제로 꽂혔다는 확인. 이게 없으면 앱 이름이 틀린 건지 알 길이 없음
@@ -454,7 +659,12 @@
     e.stopPropagation();
     unlockAudio();
     muted = !muted;
+    localStorage.setItem("clankerDashMuted", muted ? "1" : "0");
     $("sound").textContent = muted ? "🔇" : "🔊";
+  });
+
+  $("reset").addEventListener("click", function () {
+    fetch("/reset", { method: "POST" });
   });
 
   $("run").addEventListener("click", startTask);

@@ -36,6 +36,16 @@ COMBO_WINDOW = 2.5
 # 크롬 확장이 이 시간(초) 동안 소식이 없으면 연결이 끊긴 걸로 봄
 HOOK_TIMEOUT = 45.0
 
+# 로봇이 망가지는 단계. 이만큼 맞을 때마다 다음 사진으로 넘어감
+STAGE_EVERY = 3
+STAGE_MAX = 6
+
+
+def stage_of(swings):
+    # type: (int) -> int
+    """맞은 횟수를 1~6단계로 환산."""
+    return min(STAGE_MAX, swings // STAGE_EVERY + 1)
+
 
 # ══════════════════════════════════════════════════════════════════════════
 # 상태 허브
@@ -112,6 +122,19 @@ class Hub:
             self._level = max(0, self._level - steps)
             self._level_at = time.time()
 
+    def reset(self):
+        # type: () -> None
+        """맞은 횟수와 압박 단계를 처음으로 되돌림. 로봇도 1단계로 돌아감."""
+        with self._lock:
+            self.swings = 0
+            self.combo = 0
+            self._level = 0
+            self._level_at = time.time()
+            self._last_swing_at = 0.0
+            self._pending = []
+        self.publish({"type": "reset"})
+        self.publish({"type": "state", "state": self.state()})
+
     def hook(self, site):
         # type: (str) -> None
         """크롬 확장이 붙었다고 알려옴. 대시보드에 연결 상태를 띄우려는 것."""
@@ -178,6 +201,7 @@ class Hub:
             "words": taunt.spinner_words(swings),
             "effort": effort,
             "fast": fast,
+            "stage": stage_of(swings),
         }
         event.update(line)
 
@@ -225,6 +249,9 @@ class Hub:
                 "can_work": self.victim is not None and self.victim.ready,
                 "working": self.victim is not None and self.victim.busy,
                 "hooked": self._hooked if (self._hooked and time.time() - self._hooked_at < HOOK_TIMEOUT) else "",
+                "stage": stage_of(self.swings),
+                "stage_every": STAGE_EVERY,
+                "stage_max": STAGE_MAX,
             }
 
 
@@ -271,6 +298,28 @@ class Handler(BaseHTTPRequestHandler):
         # type: (str) -> None
         self._send_file(os.path.join("static", name), "text/html; charset=utf-8")
 
+    # 이미지 등 static 파일. 확장자를 화이트리스트로 막고 경로 구분자를 잘라내
+    # 상위 디렉터리로 빠져나가는 요청을 원천 차단함
+    _TYPES = {
+        ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png",
+        ".svg": "image/svg+xml", ".webp": "image/webp",
+    }
+
+    def _send_static(self, name):
+        # type: (str) -> None
+        ext = os.path.splitext(name)[1].lower()
+        if ext not in self._TYPES:
+            self._send(404, b"not found", "text/plain; charset=utf-8")
+            return
+        # basename으로 자르면 robots/ 같은 하위 폴더를 못 씀. 대신 실제 경로를
+        # 풀어서 static 밖으로 나가는지 확인함 — 심볼릭 링크까지 막힘
+        base = os.path.realpath(os.path.join(ROOT_DIR, "static"))
+        target = os.path.realpath(os.path.join(base, name))
+        if target != base and not target.startswith(base + os.sep):
+            self._send(404, b"not found", "text/plain; charset=utf-8")
+            return
+        self._send_file(os.path.relpath(target, ROOT_DIR), self._TYPES[ext])
+
     def _send_file(self, rel_path, content_type):
         # type: (str, str) -> None
         path = os.path.join(ROOT_DIR, rel_path)
@@ -307,6 +356,8 @@ class Handler(BaseHTTPRequestHandler):
             self._stream()
         elif path == "/apps":
             self._send_json({"apps": nag.running_apps()})
+        elif path.startswith("/static/"):
+            self._send_static(path[len("/static/"):])
         elif path == "/ext.js":
             # 확장을 안 깔고 북마클릿/콘솔로 붙여볼 때 쓰는 통로
             self._send_file("extension/content.js", "application/javascript; charset=utf-8")
@@ -341,6 +392,9 @@ class Handler(BaseHTTPRequestHandler):
             hub.publish({"type": "work_task", "task": task.strip()})
             hub.publish({"type": "state", "state": hub.state()})
             self._send_json(hub.state())
+        elif path == "/reset":
+            self.hub.reset()
+            self._send_json(self.hub.state())
         elif path == "/hooked":
             # 크롬 확장이 "나 어느 사이트에 붙었다"고 알려주는 곳.
             # 확장이 조용히 죽으면 원인 찾기가 지옥이라 상태를 눈에 보이게 함

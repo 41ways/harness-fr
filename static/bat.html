@@ -40,6 +40,13 @@
   /* 화면 밖에 두되 display:none은 안 됨 — 안 보이면 클릭 이벤트가 안 먹어서
      햅틱도 안 울림 */
   #hap { position: fixed; left: -9999px; width: 1px; height: 1px; opacity: 0; }
+  /* 휘두르다 잘못 누르지 않게 구석에. 대신 손가락으로 칠 만큼은 크게 */
+  #mute {
+    position: fixed; top: calc(env(safe-area-inset-top, 0px) + 12px); right: 14px;
+    margin: 0; padding: 0; width: 46px; height: 46px; font-size: 20px;
+    background: #221d18; color: #efe6d8; border: 1px solid #3a332a; border-radius: 50%;
+  }
+  #mute.off { opacity: .45; }
 </style>
 </head>
 <body>
@@ -77,6 +84,8 @@
 
   <!-- iOS 햅틱용. switch 체크박스를 토글하면 시스템 진동이 울려서 그걸 빌려 씀 -->
   <label id="hap" aria-hidden="true"><input type="checkbox" switch></label>
+
+  <button id="mute" type="button" aria-label="소리 켜기/끄기">🔊</button>
 
   <div id="start">
     <button id="go">빠따 잡기</button>
@@ -154,8 +163,18 @@
   // 맞는 소리("딱")는 여기가 아니라 맥 대시보드에서 남. 폰은 배트를 쥔 손,
   // 맥은 공이 맞는 자리라서 역할을 나눔
   // ══════════════════════════════════════════════════════════════════════
+  // 음소거는 소리만 끔 — 진동은 그대로 둠. 조용한 데서 몰래 재촉하려면
+  // 오히려 그 조합이 필요해서
+  var muted = localStorage.getItem("clankerMuted") === "1";
+
+  function applyMute() {
+    var b = $("mute");
+    b.textContent = muted ? "🔇" : "🔊";
+    b.classList.toggle("off", muted);
+  }
+
   function whoosh(strength) {
-    if (!audio) { return; }
+    if (!audio || muted) { return; }
     var t = audio.currentTime;
     var power = Math.min(strength, 60) / 60;         // 0~1로 정규화
     var dur = 0.16 + power * 0.12;
@@ -195,14 +214,28 @@
   // switch 스타일 체크박스를 토글하면 시스템 햅틱이 울리는 걸 이용함.
   // 안드로이드는 navigator.vibrate가 정석이라 그쪽을 먼저 씀
   // ══════════════════════════════════════════════════════════════════════
+  function hapticLabel() {
+    // 진동이 어느 경로로 도는지 화면에 알려줌 — 안 울릴 때 원인을 바로 알게
+    return navigator.vibrate ? "진동: 켜짐" : "진동: iOS 방식(안 울릴 수 있음)";
+  }
+
   function haptic(strength) {
     if (navigator.vibrate) {
-      navigator.vibrate(strength >= 45 ? [0, 45, 30, 25] : [0, 18]);
+      // 패턴은 [진동, 멈춤, 진동, ...] ms 순서. 첫 값이 진동 길이라서
+      // [0, n]으로 주면 0ms 울리고 끝나 아무것도 안 느껴짐 (여기서 한 번 틀림)
+      // 짧은 진동은 기기가 아예 무시하는 경우가 있어 25ms 아래로는 안 내려감
+      var pattern;
+      if (strength < 22) { pattern = [28]; }                        // 살짝
+      else if (strength < 45) { pattern = [50]; }                   // 제대로
+      else { pattern = [80, 35, 30, 30, 25]; }                      // 홈런 — 여운
+      var ok = navigator.vibrate(pattern);
+      if (!ok) { note("진동 거부됨 (기기 설정 확인)"); }
       return;
     }
+    // iOS 사파리는 navigator.vibrate가 없어서 switch 햅틱을 빌려 씀
     var label = $("hap");
     if (!label) { return; }
-    label.click();                                   // iOS 햅틱 유발
+    label.click();
     if (strength >= 45) { setTimeout(function () { label.click(); }, 70); }
   }
 
@@ -294,6 +327,7 @@
     askOrientation();
     $("start").classList.add("hidden");
     $("ready").classList.remove("hidden");
+    $("hint").textContent = "폰을 빠따처럼 쥐고 휘두르면 됨. " + hapticLabel();
     // 오디오는 사용자 제스처 안에서 만들어야 iOS가 열어줌 — 버튼 탭이 그 자리
     try {
       audio = new (window.AudioContext || window.webkitAudioContext)();
@@ -324,11 +358,19 @@
     $("err").classList.remove("hidden");
     $("start").classList.add("hidden");
     $("ready").classList.remove("hidden");
-    $("hint").textContent = "화면을 탭할 때마다 한 대씩.";
+    $("hint").textContent = "화면을 탭할 때마다 한 대씩. " + hapticLabel();
     document.body.addEventListener("click", function () {
       if (Date.now() - lastHit > COOLDOWN) { lastHit = Date.now(); hit(30); }
     });
   }
+
+  applyMute();
+  $("mute").addEventListener("click", function (e) {
+    e.stopPropagation();      // 폴백 모드에서 탭이 스윙으로 세지 않게
+    muted = !muted;
+    localStorage.setItem("clankerMuted", muted ? "1" : "0");
+    applyMute();
+  });
 
   $("go").addEventListener("click", function () {
     if (typeof DeviceMotionEvent === "undefined") {
