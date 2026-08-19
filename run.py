@@ -74,6 +74,7 @@ def main():
 
     hub = server.Hub(heckler, args.target)
     hub.victim = victim.Victim(hub, args.model, client)
+    hub.phone_url = f"https://{host}:{args.port}"
 
     threading.Thread(target=hub.watch_grab, daemon=True).start()
 
@@ -87,7 +88,7 @@ def main():
     print("")
     print("  빠따 준비 완료")
     print("  ─────────────────────────────────────────────")
-    print(f"  아이폰(빠따) : {base}")
+    print(f"  아이폰(빠따) : {base}   (대시보드 QR을 찍어도 됨)")
     print(f"  맥(대시보드) : {base}/dash")
     print(f"  크롬 확장    : http://127.0.0.1:{ext_port}  (확장이 알아서 붙음)")
     print(f"  재촉 대상 앱 : {args.target}   (대시보드에서 켜야 실제로 타이핑됨)")

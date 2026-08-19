@@ -26,7 +26,7 @@ import threading
 import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
-from . import nag, taunt, victim
+from . import nag, qr, taunt, victim
 
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -66,6 +66,7 @@ class Hub:
         self.combo = 0
         self._last_swing_at = 0.0
         self.victim = None        # 실제로 일하는 AI. run.py에서 붙여줌
+        self.phone_url = ""       # 폰이 접속할 주소. QR로 뿌림. run.py에서 붙여줌
         self._level = 0           # 압박 단계 (taunt.PRESSURE 인덱스)
         self._level_at = time.time()
         self._pending = []        # 다음 턴에 꽂을 재촉 문장들
@@ -323,6 +324,7 @@ class Hub:
                 "held": time.time() - self._grabbed_at < GRAB_TIMEOUT,
                 "stage": taunt.stage_of(self.swings, time.time() - self._grabbed_at < GRAB_TIMEOUT),
                 "stage_max": taunt.STAGE_MAX,
+                "phone_url": self.phone_url,
             }
 
 
@@ -451,6 +453,10 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json({"apps": nag.running_apps()})
         elif path.startswith("/static/"):
             self._send_static(path[len("/static/"):])
+        elif path == "/qr.svg":
+            # 폰 주소를 손으로 치기 번거로워서 대시보드에 QR로 띄움
+            self._send(200, qr.to_svg(self.hub.phone_url).encode("utf-8"),
+                       "image/svg+xml; charset=utf-8")
         elif path == "/ext.js":
             # 확장을 안 깔고 북마클릿/콘솔로 붙여볼 때 쓰는 통로
             self._send_file("extension/content.js", "application/javascript; charset=utf-8")

@@ -117,6 +117,9 @@
   .warn { color: var(--dim); font-size: 11px; line-height: 1.6; margin-top: 9px; }
   .warn.bad { color: #ff9d85; }
   .qr { color: var(--dim); font-size: 11px; word-break: break-all; }
+  .qrbox { display: flex; gap: 10px; align-items: center; }
+  .qrimg { width: 92px; height: 92px; flex: 0 0 auto; border-radius: 4px; background: #fff; }
+  .qrhint { color: var(--dim); font-size: 10px; margin-top: 5px; line-height: 1.4; }
 </style>
 </head>
 <body>
@@ -256,7 +259,13 @@
 
     <div class="card">
       <h2>빠따 연결</h2>
-      <div class="qr" id="url"></div>
+      <div class="qrbox">
+        <img class="qrimg" id="qrimg" src="/qr.svg" alt="폰 접속 QR">
+        <div>
+          <div class="qr" id="url"></div>
+          <div class="qrhint">폰 카메라로 찍으면 빠따 페이지로 감</div>
+        </div>
+      </div>
       <div class="rows" style="margin-top:9px">
         <div><span>AI 반응</span><b id="aimode">-</b></div>
         <div><span>크롬 확장</span><b id="hooked">-</b></div>
@@ -699,6 +708,9 @@
       toast(s.held ? "빠따를 들었습니다" : "빠따를 내려놓았습니다");
     }
     heldPrev = s.held;
+    // 주소는 서버가 알려준 LAN ip를 씀 — 대시보드를 localhost로 열었을 때
+    // location.origin을 그대로 보여주면 폰이 못 찾는 주소가 뜸
+    if (s.phone_url) { $("url").textContent = s.phone_url; }
     $("grabbed").textContent = s.held ? "들었음 ⚾" : "내려놓음";
     $("term").classList.toggle("armed", !!s.held);
 
@@ -824,7 +836,7 @@
   loadApps();
   $("target").addEventListener("focus", loadApps);
 
-  $("url").textContent = location.origin + "  ← 아이폰 사파리에서 여는 주소";
+  $("url").textContent = location.origin;   // state가 오기 전까지 임시로
 })();
 </script>
 </body>

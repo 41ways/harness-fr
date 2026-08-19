@@ -27,6 +27,7 @@ python3 run.py
 
 1. **맥 브라우저**에서 `https://<ip>:8443/dash` — 재촉당하는 AI 화면
 2. **아이폰 사파리**에서 `https://<ip>:8443` — 빠따
+   (대시보드 **빠따 연결** 카드의 QR을 폰 카메라로 찍어도 됨)
 
 아이폰에서 인증서 경고가 뜨면 `자세히 보기 → 이 웹사이트 방문`.
 self-signed라 어쩔 수 없음 — 센서(DeviceMotion) 권한은 https에서만 나와서
@@ -178,6 +179,7 @@ python3 run.py
 ```
 run.py            진입점 — ip 탐지, 인증서 준비, 서버 기동
 bat/cert.py       self-signed 인증서 생성 (아이폰 센서용 https)
+bat/qr.py         QR 생성 — 폰 접속 주소를 대시보드에 띄움 (외부 패키지 없이 직접 구현)
 bat/taunt.py      재촉 멘트, 스피너 단어, 오프라인 패닉 대사
 bat/nag.py        osascript 키스트로크 + Claude api 반응
 bat/server.py     https + SSE 서버
