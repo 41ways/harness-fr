@@ -1,4 +1,6 @@
-# clanker-bat — 깡! 깡통 괴롭히기
+# 🥫 clanker-bat — 깡! 깡통 괴롭히기
+
+![종류](https://img.shields.io/badge/%EC%A2%85%EB%A5%98-%EC%9E%A5%EB%82%9C%EA%B0%90-6f6f6f?style=flat-square) ![인원](https://img.shields.io/badge/%EC%9D%B8%EC%9B%90-1%EC%9D%B8%20%2B%20%EC%95%84%EC%9D%B4%ED%8F%B0%20%ED%95%9C%20%EB%8C%80-555?style=flat-square) [![허브](https://img.shields.io/badge/%ED%97%88%EB%B8%8C-41ways%EC%9D%98%20%EB%A0%88%EB%93%9C%EB%B2%84%ED%8A%BC-b4571f?style=flat-square)](https://41ways.github.io/norara/)
 
 야구 빠따를 휘둘러서 AI를 재촉하는 프로그램.
 
@@ -9,6 +11,18 @@
 아이폰 (빠따)  ──스윙──▶  로컬 서버  ──┬──▶  터미널에 "FASTER" 타이핑 + 엔터
                                       └──▶  대시보드: 재촉당하는 AI 화면
 ```
+
+## 한눈에
+
+| | |
+|---|---|
+| **종류** | 장난감 · macOS + iPhone |
+| **인원** | 1인 + 아이폰 한 대 |
+| **로컬 실행** | `python3 run.py` → 맥 브라우저 `/dash`, 아이폰 사파리로 접속 |
+| **한 줄 규칙** | 아이폰을 빠따처럼 휘두르면 맥에서 돌던 터미널 AI가 인터럽트된다 |
+| **허브** | https://41ways.github.io/norara/ |
+
+**목차** — [필요한 것](#필요한-것) · [실행](#실행) · [진짜 재촉 켜기](#진짜-재촉-켜기) · [옵션](#옵션) · [크롬에서 열어둔 AI 재촉하기 (확장)](#크롬에서-열어둔-ai-재촉하기-확장) · [진짜 Claude 재촉해서 속도 올리기](#진짜-claude-재촉해서-속도-올리기) · [스윙 세기](#스윙-세기) · [구조](#구조) · [안 한 것](#안-한-것)
 
 ## 필요한 것
 
