@@ -17,16 +17,7 @@
 
 ![대시보드 — 세 대째 맞는 순간](docs/screenshots/dash.png)
 
-<table>
-<tr>
-<td align="center"><img src="docs/screenshots/phone.png" width="200" alt="폰 빠따 화면"></td>
-<td align="center"><img src="docs/screenshots/hit.png" width="440" alt="깡! 맞는 순간"></td>
-</tr>
-<tr>
-<td align="center">폰 — 빠따</td>
-<td align="center">맥 — 깡!</td>
-</tr>
-</table>
+<p align="center"><img src="docs/screenshots/phone.png" width="200" alt="폰 빠따 화면"><br>폰 — 빠따</p>
 
 ## 한눈에
 
