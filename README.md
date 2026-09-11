@@ -7,10 +7,26 @@
 아이폰을 빠따처럼 쥐고 휘두르면 → 맥에서 돌아가는 터미널 AI가 그 자리에서
 인터럽트되고 → 대시보드에서는 재촉당한 AI가 허둥대는 걸 볼 수 있음.
 
+> [yaml (@blended_jpeg)](https://x.com/blended_jpeg)이 X에 올린 영상 — Claude
+> Code를 `FASTER`로 계속 끊어버리는 밈 — 에서 영감을 받아 만들었음.
+
 ```
 아이폰 (빠따)  ──스윙──▶  로컬 서버  ──┬──▶  터미널에 "FASTER" 타이핑 + 엔터
                                       └──▶  대시보드: 재촉당하는 AI 화면
 ```
+
+![대시보드 — 세 대째 맞는 순간](docs/screenshots/dash.png)
+
+<table>
+<tr>
+<td align="center"><img src="docs/screenshots/phone.png" width="200" alt="폰 빠따 화면"></td>
+<td align="center"><img src="docs/screenshots/hit.png" width="440" alt="깡! 맞는 순간"></td>
+</tr>
+<tr>
+<td align="center">폰 — 빠따</td>
+<td align="center">맥 — 깡!</td>
+</tr>
+</table>
 
 ## 한눈에
 
